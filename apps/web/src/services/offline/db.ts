@@ -1,6 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
 import type {
-  AsmaulHusnaEntry,
   Bookmark,
   ContentMeta,
   DhikrSessionRecord,

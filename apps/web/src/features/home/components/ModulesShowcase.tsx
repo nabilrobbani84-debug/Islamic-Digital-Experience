@@ -36,19 +36,17 @@ export function ModulesShowcase() {
         <div className="mt-12 grid items-center gap-10 lg:grid-cols-[1.3fr_1fr]">
           {tier !== "none" ? (
             <SceneBoundary tier={tier} className="relative h-[340px] sm:h-[440px]" fallback={<SceneLoadingHalo />}>
-              {(isActive) =>
-                tier !== "none" && (
-                  <LazyIslamicPortalScene
-                    tier={tier}
-                    items={items}
-                    activeIndex={active}
-                    onHover={setActive}
-                    onSelect={(i) => navigate(MODULES[i]?.to ?? "/dashboard")}
-                    reducedMotion={reducedMotion}
-                    active={isActive}
-                  />
-                )
-              }
+              {(isActive) => (
+                <LazyIslamicPortalScene
+                  tier={tier}
+                  items={items}
+                  activeIndex={active}
+                  onHover={setActive}
+                  onSelect={(i) => navigate(MODULES[i]?.to ?? "/dashboard")}
+                  reducedMotion={reducedMotion}
+                  active={isActive}
+                />
+              )}
             </SceneBoundary>
           ) : null}
 

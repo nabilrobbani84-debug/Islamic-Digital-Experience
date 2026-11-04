@@ -56,7 +56,7 @@ describe("http client", () => {
 
   it("mengirim header CSRF dari cookie untuk request yang mengubah data", async () => {
     document.cookie = "nur_csrf=token123";
-    const fetchMock = vi.fn(async () => json(200, { success: true, data: null }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => json(200, { success: true, data: null }));
     vi.stubGlobal("fetch", fetchMock);
     await createHttpClient("/api/v1").request("/bookmarks", { method: "POST", body: { a: 1 } });
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;

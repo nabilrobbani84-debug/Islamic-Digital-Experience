@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate, useLocation, useSearchParams } from "react-router";
 import { PageLoader } from "@/components/feedback/RouteFallbacks";
 import { PermissionDenied } from "@/components/feedback/States";
 import { can, useAuth, type Permission } from "@/stores/auth";
@@ -16,11 +16,21 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Halaman tamu (login/register) mengarahkan pengguna yang sudah masuk ke dashboard. */
+/** Hanya izinkan redirect internal (mencegah open redirect). */
+export function safeNext(next: string | null): string {
+  if (!next) return "/dashboard";
+  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/dashboard";
+}
+
+/**
+ * Halaman tamu (login/register). Setelah pengguna masuk, guard ini satu-satunya yang
+ * melakukan redirect (ke `?next=` atau dashboard) agar tidak ada dua navigasi yang berlomba.
+ */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const status = useAuth((s) => s.status);
+  const [params] = useSearchParams();
   if (status === "loading") return <PageLoader />;
-  if (status === "authenticated" || status === "offline-session") return <Navigate to="/dashboard" replace />;
+  if (status === "authenticated" || status === "offline-session") return <Navigate to={safeNext(params.get("next"))} replace />;
   return <>{children}</>;
 }
 

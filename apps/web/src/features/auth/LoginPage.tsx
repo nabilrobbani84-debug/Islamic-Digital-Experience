@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail } from "lucide-react";
@@ -11,20 +11,7 @@ import { rememberSession } from "./useSession";
 import { loginSchema, type LoginValues } from "./schemas";
 import { AuthHeading, FormAlert, PasswordInput } from "./components";
 
-/** Hanya izinkan redirect internal (mencegah open redirect). */
-export function safeNext(next: string | null): string {
-  if (!next) return "/dashboard";
-  try {
-    const decoded = decodeURIComponent(next);
-    return decoded.startsWith("/") && !decoded.startsWith("//") ? decoded : "/dashboard";
-  } catch {
-    return "/dashboard";
-  }
-}
-
 export default function LoginPage() {
-  const [params] = useSearchParams();
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: "", password: "" } });
 
@@ -32,9 +19,9 @@ export default function LoginPage() {
     setError(null);
     try {
       const user = await api.auth.login({ email: values.email.toLowerCase(), password: values.password, deviceName: navigator.platform || undefined });
-      useAuth.getState().setAuthenticated(user);
       await rememberSession(user);
-      navigate(safeNext(params.get("next")), { replace: true });
+      // GuestOnly akan mengarahkan ke `?next=` (atau dashboard) begitu status berubah.
+      useAuth.getState().setAuthenticated(user);
     } catch (err) {
       if (isApiError(err) && (err.status === 401 || err.code === "INVALID_CREDENTIALS")) setError("Email atau kata sandi salah.");
       else if (isApiError(err) && err.code === "EMAIL_NOT_VERIFIED") setError("Email belum diverifikasi. Periksa kotak masuk Anda.");

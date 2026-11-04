@@ -35,11 +35,19 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ["**/*.{js,css,html,svg,woff2}"],
+          // Engine 3D tidak di-precache agar perangkat fallback 2D tidak mengunduhnya;
+          // chunk ini di-cache saat pertama kali dipakai (runtime caching di bawah).
+          globIgnores: ["**/assets/three-*.js", "**/assets/*Scene*-*.js", "**/assets/Quran3DExperience-*.js", "**/assets/QiblaCompass3D-*.js", "**/assets/GeometricHalo-*.js", "**/assets/IslamicPortal-*.js"],
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           navigateFallback: "/index.html",
           // Jangan pernah menyajikan respons API (termasuk auth) dari cache service worker.
           navigateFallbackDenylist: [/^\/api\//],
           runtimeCaching: [
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith("/assets/") && url.pathname.endsWith(".js"),
+              handler: "CacheFirst",
+              options: { cacheName: "nur-lazy-chunks-v1", expiration: { maxEntries: 60 } },
+            },
             {
               urlPattern: ({ url }) => url.pathname.startsWith("/models/") || url.pathname.startsWith("/textures/"),
               handler: "CacheFirst",
@@ -64,11 +72,11 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {
+          // Hanya three.js (tanpa dependensi) yang dipisah manual. R3F/Drei dibiarkan di chunk scene
+          // yang di-lazy-load; memaksa R3F ke manual chunk akan ikut menarik dependensi bersama
+          // (mis. zustand) sehingga entry utama mengimpor chunk 3D secara statis.
           manualChunks(id) {
             if (id.includes("node_modules/three/")) return "three";
-            if (id.includes("@react-three")) return "r3f";
-            if (id.includes("framer-motion") || id.includes("motion-dom")) return "motion";
-            if (id.includes("node_modules/react") || id.includes("react-router") || id.includes("scheduler")) return "react";
             return undefined;
           },
         },

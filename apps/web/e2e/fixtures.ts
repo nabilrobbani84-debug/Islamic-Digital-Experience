@@ -30,6 +30,7 @@ export async function login(page: Page, email = "demo@nur.local", password = "de
   await page.getByLabel("Kata sandi", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Masuk", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { level: 1, name: /Selamat|Pengguna|Admin/ })).toBeVisible();
 }
 
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {

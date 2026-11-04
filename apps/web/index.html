@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#064E3B" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="description" content="NUR Islamic Digital Experience — Al-Qur'an, waktu sholat, kiblat, kalender Hijriah, zakat, dzikir, doa, dan hadis dalam pengalaman digital yang tenang dan immersive." />
+    <title>NUR — Islamic Digital Experience</title>
+    <script>
+      // Terapkan tema sebelum render pertama untuk mencegah kilatan warna.
+      try {
+        var stored = JSON.parse(localStorage.getItem("nur-preferences") || "{}");
+        var theme = stored && stored.state && stored.state.theme;
+        if (theme === "light") document.documentElement.classList.remove("dark");
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <noscript>NUR membutuhkan JavaScript untuk berjalan.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

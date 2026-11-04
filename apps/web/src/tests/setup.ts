@@ -45,6 +45,22 @@ class MockResizeObserver implements ResizeObserver {
 }
 globalThis.ResizeObserver = MockResizeObserver;
 
+// jsdom belum mengimplementasikan PointerEvent; Framer Motion memakainya untuk gesture tap via keyboard.
+if (typeof globalThis.PointerEvent === "undefined") {
+  class PolyfillPointerEvent extends MouseEvent {
+    readonly pointerId: number;
+    readonly pointerType: string;
+    readonly isPrimary: boolean;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+      this.pointerType = init.pointerType ?? "mouse";
+      this.isPrimary = init.isPrimary ?? true;
+    }
+  }
+  globalThis.PointerEvent = PolyfillPointerEvent as unknown as typeof PointerEvent;
+}
+
 Element.prototype.scrollIntoView = vi.fn();
 // WebGL tidak tersedia di jsdom → komponen 3D harus memakai fallback 2D.
 HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext;

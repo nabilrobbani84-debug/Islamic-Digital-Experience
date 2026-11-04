@@ -16,7 +16,8 @@ test.describe("Autentikasi", () => {
     await expect(page.getByRole("heading", { level: 1, name: /Pengguna/ })).toBeVisible();
     await page.getByRole("button", { name: /Menu akun/ }).click();
     await page.getByRole("menuitem", { name: "Keluar" }).click();
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?.*)?$/);
+    await expect(page.getByRole("heading", { name: "Masuk ke NUR" })).toBeVisible();
     // Setelah logout, rute aplikasi kembali terkunci.
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login\?next=/);

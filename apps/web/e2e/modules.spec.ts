@@ -29,7 +29,9 @@ test.describe("Modul ibadah", () => {
 
   test("Quran: daftar → reader → bookmark → pengaturan bacaan", async ({ page }) => {
     await navigateClient(page, "/quran");
-    await page.getByRole("link", { name: /Contoh Surah 1/ }).click();
+    const list = page.getByRole("list", { name: "Daftar surah" });
+    await expect(list).toBeVisible();
+    await list.getByRole("link", { name: /Contoh Surah 1/ }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Contoh Surah 1" })).toBeVisible();
     await page.getByRole("button", { name: "Bookmark ayat 2" }).click();
     await expect(page.getByText("Bookmark disimpan")).toBeVisible();

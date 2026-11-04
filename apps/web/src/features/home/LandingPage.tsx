@@ -15,28 +15,36 @@ import { isPrayerDayReady, PRAYER_LABELS, remainingMs, usePrayerDay } from "@/fe
 import { ModulesShowcase } from "./components/ModulesShowcase";
 import { ValuesSection } from "./components/ValuesSection";
 
+/**
+ * Rentang progres scroll per bab. Semua nilai WAJIB di dalam 0..1 karena Framer Motion
+ * mengakselerasi animasi scroll dengan WAAPI (offset di luar 0..1 memicu error).
+ */
 const CHAPTERS = [
-  { range: [0, 0.04, 0.16, 0.22], eyebrow: "", title: "", body: "" },
+  { range: [0, 0.04, 0.16, 0.22], out: [0, 1, 1, 0], eyebrow: "", title: "", body: "" },
   {
     range: [0.2, 0.27, 0.38, 0.44],
+    out: [0, 1, 1, 0],
     eyebrow: "Al-Qur'an",
     title: "Membaca dengan tenang, tanpa gangguan.",
     body: "Teks Utsmani yang jernih, terjemahan, tafsir, murottal dengan sinkronisasi ayat, dan mode fokus. Animasi tidak pernah mengganggu bacaan.",
   },
   {
     range: [0.42, 0.49, 0.6, 0.66],
+    out: [0, 1, 1, 0],
     eyebrow: "Waktu Sholat & Kiblat",
     title: "Dihitung di perangkat Anda.",
     body: "Mesin astronomi lokal menghitung jadwal sholat, arah kiblat, dan kalender Hijriah tanpa API pihak ketiga, tetap berfungsi saat offline.",
   },
   {
     range: [0.64, 0.71, 0.8, 0.86],
+    out: [0, 1, 1, 0],
     eyebrow: "Dzikir, Doa & Hadis",
     title: "Teman ibadah sehari-hari.",
     body: "Penghitung dzikir dengan target dan riwayat, doa harian, Asmaul Husna, dan Hadis Arba'in dari dataset bersumber.",
   },
   {
-    range: [0.84, 0.9, 1, 1.01],
+    range: [0.84, 0.9, 0.98, 1],
+    out: [0, 1, 1, 1],
     eyebrow: "Offline-first",
     title: "Ibadah tidak menunggu sinyal.",
     body: "Unduh Al-Qur'an dan audio sekali, lalu gunakan di mana saja. Progres tersinkron otomatis saat kembali online.",
@@ -45,9 +53,9 @@ const CHAPTERS = [
 
 function Chapter({ progress, index }: { progress: MotionValue<number>; index: number }) {
   const chapter = CHAPTERS[index]!;
-  const [a, b, c, d] = chapter.range;
-  const opacity = useTransform(progress, [a, b, c, d], [0, 1, 1, 0]);
-  const y = useTransform(progress, [a, b, c, d], [40, 0, 0, -40]);
+  const input = [...chapter.range];
+  const opacity = useTransform(progress, input, [...chapter.out]);
+  const y = useTransform(progress, input, chapter.out.map((o, i) => (o === 1 ? 0 : i === 0 ? 40 : -40)));
   const pointerEvents = useTransform(opacity, (o) => (o > 0.5 ? "auto" : "none"));
   return (
     <motion.article style={{ opacity, y, pointerEvents }} className="absolute inset-x-0 bottom-[14%] mx-auto max-w-7xl px-5 sm:px-8 md:bottom-auto md:top-1/2 md:-translate-y-1/2">

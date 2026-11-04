@@ -33,8 +33,23 @@ export async function login(page: Page, email = "demo@nur.local", password = "de
 }
 
 export async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  expect(overflow, "halaman tidak boleh memiliki horizontal overflow").toBeLessThanOrEqual(1);
+  const report = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const overflow = document.documentElement.scrollWidth - width;
+    // Elemen terdalam yang melewati tepi kanan viewport, untuk diagnosis.
+    const offenders = [...document.querySelectorAll<HTMLElement>("body *")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.right <= width + 1 || r.width === 0) return false;
+        const style = getComputedStyle(el);
+        if (style.position === "fixed") return false;
+        return ![...el.children].some((c) => c.getBoundingClientRect().right > width + 1);
+      })
+      .slice(0, 5)
+      .map((el) => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 80)} (right=${Math.round(el.getBoundingClientRect().right)})`);
+    return { overflow, offenders };
+  });
+  expect(report.overflow, `horizontal overflow ${report.overflow}px di ${page.url()}:\n${report.offenders.join("\n")}`).toBeLessThanOrEqual(1);
 }
 
 /** Navigasi sisi klien (tanpa reload) agar sesi mock di memori tetap ada. */

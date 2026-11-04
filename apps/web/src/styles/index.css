@@ -97,6 +97,13 @@
   }
 }
 
+@layer base {
+  /* Item grid/flex boleh menyusut: teks nowrap/truncate tidak boleh melebarkan track dan memicu horizontal overflow. */
+  :where(.grid) > * {
+    min-width: 0;
+  }
+}
+
 @layer components {
   .nur-glass {
     background: var(--nur-glass);

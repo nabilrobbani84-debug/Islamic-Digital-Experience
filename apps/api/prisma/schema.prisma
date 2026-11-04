@@ -1,0 +1,1032 @@
+// NUR Islamic Digital Experience — Prisma schema
+// Target: Prisma ORM 7 + PostgreSQL 17
+//
+// Konvensi:
+// - Semua timestamp memakai timestamptz (@db.Timestamptz(3)).
+// - UUID v7 (urut waktu) agar index B-tree tetap rapat dan ID bisa dibuat di klien saat offline.
+// - Tabel data personal yang disinkronkan memiliki: created_at, updated_at, deleted_at (tombstone), version.
+//   sync_status TIDAK disimpan di server; status itu hanya ada di IndexedDB (lihat README).
+// - CHECK constraint, trigger, dan index pencarian ada di prisma/sql/001_constraints_and_search.sql.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: URL koneksi dikonfigurasi di prisma.config.ts, bukan di sini.
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+enum RevelationType {
+  MAKKIYAH
+  MADANIYAH
+}
+
+enum PrayerName {
+  FAJR
+  SUNRISE
+  DHUHR
+  ASR
+  MAGHRIB
+  ISHA
+}
+
+enum CalendarMethod {
+  TABULAR
+  CUSTOM_HISAB
+}
+
+enum ZakatType {
+  FITRAH
+  MAAL
+  INCOME
+  TRADE
+  GOLD
+  SILVER
+  SAVINGS
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum RevisionAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum FavoriteContentType {
+  DHIKR_ITEM
+  DAILY_DUA
+  HADITH
+  PRAYER_CONTENT
+}
+
+enum SyncEntityType {
+  BOOKMARK
+  READING_PROGRESS
+  READING_HISTORY
+  USER_SETTING
+  PRAYER_LOCATION
+  PRAYER_ADJUSTMENT
+  DHIKR_SESSION
+  ZAKAT_CALCULATION
+  USER_FAVORITE
+  ASMAUL_FAVORITE
+  AUDIO_PLAYLIST
+}
+
+enum SyncOperation {
+  UPSERT
+  DELETE
+}
+
+// Hasil pemrosesan perubahan di server. Status klien (SYNCED/PENDING/FAILED) ada di IndexedDB.
+enum SyncChangeStatus {
+  APPLIED
+  CONFLICT
+  REJECTED
+}
+
+// ============================================================
+// IDENTITY & ACCESS
+// ============================================================
+
+model User {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  name            String    @db.VarChar(120)
+  // Disimpan dalam huruf kecil (CHECK di SQL) agar unik tanpa membedakan kapital.
+  email           String    @unique @db.VarChar(255)
+  passwordHash    String    @map("password_hash") // Argon2id (format PHC string)
+  role            UserRole  @default(USER)
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions          AuthSession[]
+  tokens            UserToken[]
+  settings          UserSetting?
+  bookmarks         Bookmark[]
+  progress          ReadingProgress[]
+  history           ReadingHistory[]
+  locations         PrayerLocation[]
+  dhikrSessions     DhikrSession[]
+  zakatCalculations ZakatCalculation[]
+  favorites         UserFavorite[]
+  asmaulFavorites   AsmaulFavorite[]
+  playlists         AudioPlaylist[]
+  syncChanges       SyncChange[]
+  auditLogs         AdminAuditLog[]
+  authoredRevisions ContentRevision[] @relation("RevisionAuthor")
+  reviewedRevisions ContentRevision[] @relation("RevisionReviewer")
+  approvedDatasets  DatasetVersion[]  @relation("DatasetApprover")
+
+  @@map("users")
+}
+
+// Satu baris = satu perangkat/sesi login. Dipakai untuk device/session management.
+model AuthSession {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  deviceName   String?   @map("device_name") @db.VarChar(120)
+  userAgent    String?   @map("user_agent") @db.VarChar(512)
+  ipAddress    String?   @map("ip_address") @db.Inet
+  lastUsedAt   DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokeReason String?   @map("revoke_reason") @db.VarChar(60)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+  syncChanges   SyncChange[]
+
+  @@index([userId, revokedAt])
+  @@map("auth_sessions")
+}
+
+// Rotasi refresh token. Setiap refresh membuat token baru dan menandai token lama (used_at, replaced_by_id).
+// Jika token yang sudah dipakai muncul lagi, seluruh AuthSession dicabut (reuse detection).
+model RefreshToken {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  sessionId    String    @map("session_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash") // SHA-256 dari token acak 256-bit; token mentah tidak pernah disimpan
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt       DateTime? @map("used_at") @db.Timestamptz(3)
+  replacedById String?   @unique @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  session    AuthSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  replacedBy RefreshToken? @relation("TokenRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces   RefreshToken? @relation("TokenRotation")
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+// Token sekali pakai untuk verifikasi email dan reset password.
+model UserToken {
+  id        String       @id @default(uuid(7)) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  purpose   TokenPurpose
+  tokenHash String       @unique @map("token_hash")
+  expiresAt DateTime     @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime?    @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("user_tokens")
+}
+
+model UserSetting {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  theme              String   @default("dark") @db.VarChar(20)
+  arabicFontSize     Int      @default(32) @map("arabic_font_size")
+  translationEnabled Boolean  @default(true) @map("translation_enabled")
+  tafsirEnabled      Boolean  @default(false) @map("tafsir_enabled")
+  audioSpeed         Decimal  @default(1.0) @map("audio_speed") @db.Decimal(3, 2)
+  reducedMotion      Boolean  @default(false) @map("reduced_motion")
+  version            Int      @default(1)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+// ============================================================
+// QURAN & TAFSIR
+// ============================================================
+
+model Surah {
+  id             Int            @id @default(autoincrement())
+  number         Int            @unique
+  nameArabic     String         @map("name_arabic")
+  nameLatin      String         @map("name_latin")
+  meaning        String?
+  revelationType RevelationType @map("revelation_type")
+  totalVerses    Int            @map("total_verses")
+
+  verses          Verse[]
+  juzStarts       Juz[]             @relation("JuzStart")
+  juzEnds         Juz[]             @relation("JuzEnd")
+  readingProgress ReadingProgress[]
+  audioAssets     AudioAsset[]
+
+  @@map("surahs")
+}
+
+model Verse {
+  id             BigInt   @id @default(autoincrement())
+  surahId        Int      @map("surah_id")
+  verseNumber    Int      @map("verse_number")
+  globalNumber   Int      @unique @map("global_number")
+  textUthmani    String   @map("text_uthmani") @db.Text
+  // Teks Arab tanpa harakat/tanda waqaf, hasil normalisasi saat import. Dipakai untuk pencarian trigram.
+  textNormalized String   @map("text_normalized") @db.Text
+  pageNumber     Int      @map("page_number")
+  juzNumber      Int      @map("juz_number")
+  hizbNumber     Int?     @map("hizb_number")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  surah        Surah              @relation(fields: [surahId], references: [id])
+  translations VerseTranslation[]
+  tafsirs      TafsirContent[]
+  bookmarks    Bookmark[]
+  histories    ReadingHistory[]
+  progress     ReadingProgress[]
+  juzMappings  JuzVerse[]
+  segments     AudioSegment[]
+
+  // Unique ini sudah membuat index (surah_id, verse_number); index terpisah tidak diperlukan.
+  @@unique([surahId, verseNumber])
+  @@index([juzNumber])
+  @@index([pageNumber])
+  @@map("verses")
+}
+
+model Juz {
+  id           Int @id @default(autoincrement())
+  number       Int @unique
+  startSurahId Int @map("start_surah_id")
+  startVerse   Int @map("start_verse")
+  endSurahId   Int @map("end_surah_id")
+  endVerse     Int @map("end_verse")
+
+  startSurah Surah      @relation("JuzStart", fields: [startSurahId], references: [id])
+  endSurah   Surah      @relation("JuzEnd", fields: [endSurahId], references: [id])
+  verses     JuzVerse[]
+
+  @@map("juzs")
+}
+
+model JuzVerse {
+  id      Int    @id @default(autoincrement())
+  juzId   Int    @map("juz_id")
+  verseId BigInt @map("verse_id")
+
+  juz   Juz   @relation(fields: [juzId], references: [id], onDelete: Cascade)
+  verse Verse @relation(fields: [verseId], references: [id], onDelete: Cascade)
+
+  @@unique([juzId, verseId])
+  @@map("juz_verses")
+}
+
+model QuranEdition {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  name            String
+  language        String        @default("id") @db.VarChar(10)
+  source          String
+  version         String
+  contentSourceId String?       @map("content_source_id") @db.Uuid
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(3)
+
+  contentSource ContentSource?     @relation(fields: [contentSourceId], references: [id])
+  translations  VerseTranslation[]
+
+  @@unique([name, version])
+  @@map("quran_editions")
+}
+
+model VerseTranslation {
+  id              String @id @default(uuid(7)) @db.Uuid
+  verseId         BigInt @map("verse_id")
+  editionId       String @map("edition_id") @db.Uuid
+  translationText String @map("translation_text") @db.Text
+
+  verse   Verse        @relation(fields: [verseId], references: [id], onDelete: Cascade)
+  edition QuranEdition @relation(fields: [editionId], references: [id])
+
+  @@unique([verseId, editionId])
+  @@index([editionId])
+  @@map("verse_translations")
+}
+
+model TafsirSource {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  name            String
+  author          String
+  language        String        @default("id") @db.VarChar(10)
+  reference       String?
+  contentSourceId String?       @map("content_source_id") @db.Uuid
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(3)
+
+  contentSource ContentSource?  @relation(fields: [contentSourceId], references: [id])
+  contents      TafsirContent[]
+
+  @@map("tafsir_sources")
+}
+
+model TafsirContent {
+  id       String @id @default(uuid(7)) @db.Uuid
+  verseId  BigInt @map("verse_id")
+  sourceId String @map("source_id") @db.Uuid
+  content  String @db.Text
+
+  verse  Verse        @relation(fields: [verseId], references: [id], onDelete: Cascade)
+  source TafsirSource @relation(fields: [sourceId], references: [id])
+
+  @@unique([verseId, sourceId])
+  @@map("tafsir_contents")
+}
+
+// ============================================================
+// PERSONAL QURAN DATA (disinkronkan)
+// ============================================================
+
+// Soft delete: menghapus = mengisi deleted_at. Membuat ulang bookmark yang sama = update baris lama
+// (deleted_at = NULL, version + 1), sehingga unique (user_id, verse_id) tetap berlaku.
+model Bookmark {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  verseId   BigInt    @map("verse_id")
+  note      String?   @db.Text
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verse Verse @relation(fields: [verseId], references: [id])
+
+  @@unique([userId, verseId])
+  @@index([userId, updatedAt])
+  @@map("bookmarks")
+}
+
+model ReadingProgress {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  surahId   Int       @map("surah_id")
+  verseId   BigInt    @map("verse_id")
+  lastPage  Int       @map("last_page")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  surah Surah @relation(fields: [surahId], references: [id])
+  verse Verse @relation(fields: [verseId], references: [id])
+
+  @@unique([userId, surahId])
+  @@index([userId, updatedAt])
+  @@map("reading_progress")
+}
+
+// Append-only: tidak di-update, jadi tidak perlu version/deleted_at.
+model ReadingHistory {
+  id     String   @id @default(uuid(7)) @db.Uuid
+  userId String   @map("user_id") @db.Uuid
+  verseId BigInt  @map("verse_id")
+  readAt DateTime @default(now()) @map("read_at") @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verse Verse @relation(fields: [verseId], references: [id])
+
+  @@index([userId, readAt])
+  @@map("reading_history")
+}
+
+// ============================================================
+// AUDIO
+// ============================================================
+
+model Qari {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  name            String
+  biography       String?       @db.Text
+  country         String?
+  photoPath       String?       @map("photo_path")
+  contentSourceId String?       @map("content_source_id") @db.Uuid
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(3)
+
+  contentSource ContentSource? @relation(fields: [contentSourceId], references: [id])
+  assets        AudioAsset[]
+
+  @@map("qaris")
+}
+
+model AudioAsset {
+  id         String @id @default(uuid(7)) @db.Uuid
+  qariId     String @map("qari_id") @db.Uuid
+  surahId    Int    @map("surah_id")
+  filePath   String @map("file_path")
+  fileFormat String @map("file_format") @db.VarChar(10)
+  fileSize   BigInt @map("file_size")
+  checksum   String @db.VarChar(128) // SHA-256 hex
+  durationMs Int    @map("duration_ms")
+
+  qari          Qari                @relation(fields: [qariId], references: [id])
+  surah         Surah               @relation(fields: [surahId], references: [id])
+  segments      AudioSegment[]
+  playlistItems AudioPlaylistItem[]
+
+  @@unique([qariId, surahId])
+  @@map("audio_assets")
+}
+
+model AudioSegment {
+  id           String @id @default(uuid(7)) @db.Uuid
+  audioAssetId String @map("audio_asset_id") @db.Uuid
+  verseId      BigInt @map("verse_id")
+  startMs      Int    @map("start_ms")
+  endMs        Int    @map("end_ms")
+
+  audioAsset AudioAsset @relation(fields: [audioAssetId], references: [id], onDelete: Cascade)
+  verse      Verse      @relation(fields: [verseId], references: [id])
+
+  @@unique([audioAssetId, verseId])
+  @@map("audio_segments")
+}
+
+model AudioPlaylist {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  name      String    @db.VarChar(120)
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items AudioPlaylistItem[]
+
+  @@index([userId, updatedAt])
+  @@map("audio_playlists")
+}
+
+// Item playlist disinkronkan sebagai bagian dari payload AudioPlaylist (satu unit versi).
+model AudioPlaylistItem {
+  id           String @id @default(uuid(7)) @db.Uuid
+  playlistId   String @map("playlist_id") @db.Uuid
+  audioAssetId String @map("audio_asset_id") @db.Uuid
+  position     Int
+
+  playlist   AudioPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  audioAsset AudioAsset    @relation(fields: [audioAssetId], references: [id])
+
+  @@unique([playlistId, position])
+  @@map("audio_playlist_items")
+}
+
+// ============================================================
+// PRAYER TIMES & QIBLA
+// ============================================================
+
+model PrayerMethod {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  code                String   @unique @db.VarChar(40) // contoh: KEMENAG_RI, MWL, UMM_AL_QURA
+  name                String
+  fajrAngle           Decimal  @map("fajr_angle") @db.Decimal(5, 2)
+  // Isha memakai sudut ATAU interval tetap setelah maghrib (misalnya Umm al-Qura). Minimal satu wajib (CHECK di SQL).
+  ishaAngle           Decimal? @map("isha_angle") @db.Decimal(5, 2)
+  ishaIntervalMinutes Int?     @map("isha_interval_minutes")
+  asrFactor           Decimal  @default(1) @map("asr_factor") @db.Decimal(4, 2)
+  parameters          Json     @default("{}") // ihtiyati, koreksi ketinggian, aturan lintang tinggi, dll.
+  // false sampai parameter dicocokkan dengan sumber resmi.
+  isVerified          Boolean  @default(false) @map("is_verified")
+  verificationSource  String?  @map("verification_source") @db.Text
+
+  times     PrayerTime[]
+  locations PrayerLocation[]
+
+  @@map("prayer_methods")
+}
+
+model PrayerLocation {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  methodId  String?   @map("method_id") @db.Uuid
+  name      String    @db.VarChar(120)
+  latitude  Decimal   @db.Decimal(10, 7)
+  longitude Decimal   @db.Decimal(10, 7)
+  elevation Decimal?  @db.Decimal(8, 2)
+  timezone  String    @db.VarChar(64) // nama zona IANA, misalnya Asia/Jakarta
+  isDefault Boolean   @default(false) @map("is_default")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method       PrayerMethod?      @relation(fields: [methodId], references: [id], onDelete: SetNull)
+  times        PrayerTime[]
+  adjustments  PrayerAdjustment[]
+  calibrations QiblaCalibration[]
+
+  @@index([userId, updatedAt])
+  @@map("prayer_locations")
+}
+
+// Cache hasil calculation engine. Sumber kebenaran tetap engine lokal.
+// Waktu disimpan sebagai "wall-clock" menit lokal (jam*60 + menit) pada prayer_date di zona `timezone`.
+// Nilai >= 1440 berarti waktu jatuh setelah tengah malam (misalnya Isya di lintang tinggi).
+// NULL berarti engine tidak menemukan solusi normal (lintang ekstrem), lihat high_latitude_rule.
+model PrayerTime {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  locationId       String   @map("location_id") @db.Uuid
+  methodId         String   @map("method_id") @db.Uuid
+  prayerDate       DateTime @map("prayer_date") @db.Date
+  timezone         String   @db.VarChar(64)
+  fajrMinutes      Int?     @map("fajr_minutes")
+  sunriseMinutes   Int?     @map("sunrise_minutes")
+  dhuhrMinutes     Int      @map("dhuhr_minutes")
+  asrMinutes       Int?     @map("asr_minutes")
+  maghribMinutes   Int?     @map("maghrib_minutes")
+  ishaMinutes      Int?     @map("isha_minutes")
+  highLatitudeRule String?  @map("high_latitude_rule") @db.VarChar(40)
+  algorithmVersion String   @map("algorithm_version") @db.VarChar(20)
+  calculatedAt     DateTime @default(now()) @map("calculated_at") @db.Timestamptz(3)
+
+  location PrayerLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  method   PrayerMethod   @relation(fields: [methodId], references: [id])
+
+  @@unique([locationId, methodId, prayerDate])
+  @@map("prayer_times")
+}
+
+model PrayerAdjustment {
+  id         String     @id @default(uuid(7)) @db.Uuid
+  locationId String     @map("location_id") @db.Uuid
+  prayerName PrayerName @map("prayer_name")
+  minutes    Int
+  version    Int        @default(1)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  location PrayerLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, prayerName])
+  @@map("prayer_adjustments")
+}
+
+model QiblaCalibration {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  locationId      String   @map("location_id") @db.Uuid
+  qiblaBearing    Decimal  @map("qibla_bearing") @db.Decimal(7, 3)
+  magneticHeading Decimal? @map("magnetic_heading") @db.Decimal(7, 3)
+  calibratedAt    DateTime @default(now()) @map("calibrated_at") @db.Timestamptz(3)
+
+  location PrayerLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@index([locationId, calibratedAt])
+  @@map("qibla_calibrations")
+}
+
+// ============================================================
+// HIJRI CALENDAR
+// ============================================================
+
+model HijriDate {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  gregorianDate DateTime       @map("gregorian_date") @db.Date
+  hijriDay      Int            @map("hijri_day")
+  hijriMonth    Int            @map("hijri_month")
+  hijriYear     Int            @map("hijri_year")
+  method        CalendarMethod
+
+  // Satu tanggal Masehi bisa punya hasil berbeda per metode.
+  @@unique([gregorianDate, method])
+  @@index([method, hijriYear, hijriMonth, hijriDay])
+  @@map("hijri_dates")
+}
+
+model IslamicEvent {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  name        String
+  hijriMonth  Int     @map("hijri_month")
+  hijriDay    Int     @map("hijri_day")
+  description String? @db.Text
+
+  @@index([hijriMonth, hijriDay])
+  @@map("islamic_events")
+}
+
+model HijriAdjustment {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  method         CalendarMethod
+  hijriYear      Int            @map("hijri_year")
+  hijriMonth     Int            @map("hijri_month")
+  adjustmentDays Int            @default(0) @map("adjustment_days")
+  note           String?        @db.Text // dasar koreksi, misalnya hasil sidang isbat
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([method, hijriYear, hijriMonth])
+  @@map("hijri_adjustments")
+}
+
+// ============================================================
+// ZAKAT
+// ============================================================
+
+// Aturan bersifat immutable per rule_version. Perubahan aturan = versi baru.
+model ZakatRule {
+  id           String        @id @default(uuid(7)) @db.Uuid
+  type         ZakatType
+  rate         Decimal       @db.Decimal(8, 6)
+  nisabType    String        @map("nisab_type") @db.VarChar(40)
+  requiresHaul Boolean       @default(false) @map("requires_haul")
+  ruleVersion  String        @map("rule_version") @db.VarChar(20)
+  parameters   Json          @default("{}")
+  status       ContentStatus @default(DRAFT)
+
+  calculations ZakatCalculation[]
+
+  @@unique([type, ruleVersion])
+  @@map("zakat_rules")
+}
+
+model ZakatCalculation {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  ruleId         String    @map("rule_id") @db.Uuid
+  totalAssets    Decimal   @map("total_assets") @db.Decimal(20, 2)
+  deductibleDebt Decimal   @default(0) @map("deductible_debt") @db.Decimal(20, 2)
+  netAssets      Decimal   @map("net_assets") @db.Decimal(20, 2)
+  nisabValue     Decimal   @map("nisab_value") @db.Decimal(20, 2)
+  haulCompleted  Boolean   @default(false) @map("haul_completed")
+  eligible       Boolean
+  payableAmount  Decimal   @map("payable_amount") @db.Decimal(20, 2)
+  currency       String    @default("IDR") @db.Char(3)
+  calculatedAt   DateTime  @default(now()) @map("calculated_at") @db.Timestamptz(3)
+  version        Int       @default(1)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule  ZakatRule              @relation(fields: [ruleId], references: [id])
+  items ZakatCalculationItem[]
+
+  @@index([userId, updatedAt])
+  @@map("zakat_calculations")
+}
+
+model ZakatCalculationItem {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  calculationId String  @map("calculation_id") @db.Uuid
+  itemName      String  @map("item_name") @db.VarChar(120)
+  amount        Decimal @db.Decimal(20, 2)
+
+  calculation ZakatCalculation @relation(fields: [calculationId], references: [id], onDelete: Cascade)
+
+  @@index([calculationId])
+  @@map("zakat_calculation_items")
+}
+
+// ============================================================
+// ISLAMIC KNOWLEDGE
+// ============================================================
+
+model AsmaulHusna {
+  id              Int           @id @default(autoincrement())
+  number          Int           @unique
+  arabicName      String        @map("arabic_name")
+  transliteration String
+  meaning         String
+  explanation     String?       @db.Text
+  source          String?
+  status          ContentStatus @default(DRAFT)
+
+  favorites AsmaulFavorite[]
+
+  @@map("asmaul_husna")
+}
+
+model AsmaulFavorite {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  asmaulId  Int       @map("asmaul_id")
+  version   Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asmaul AsmaulHusna @relation(fields: [asmaulId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, asmaulId])
+  @@map("asmaul_favorites")
+}
+
+model DhikrCategory {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+
+  items DhikrItem[]
+
+  @@map("dhikr_categories")
+}
+
+model DhikrItem {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  categoryId       Int           @map("category_id")
+  arabicText       String        @map("arabic_text") @db.Text
+  transliteration  String
+  translation      String        @db.Text
+  recommendedCount Int           @default(1) @map("recommended_count")
+  source           String?
+  status           ContentStatus @default(DRAFT)
+
+  category DhikrCategory  @relation(fields: [categoryId], references: [id])
+  sessions DhikrSession[]
+
+  @@index([categoryId])
+  @@map("dhikr_items")
+}
+
+model DhikrSession {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  dhikrItemId String    @map("dhikr_item_id") @db.Uuid
+  count       Int       @default(0)
+  targetCount Int       @map("target_count")
+  startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  version     Int       @default(1)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item DhikrItem @relation(fields: [dhikrItemId], references: [id])
+
+  @@index([userId, updatedAt])
+  @@map("dhikr_sessions")
+}
+
+model DuaCategory {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  mappings DuaCategoryMap[]
+
+  @@map("dua_categories")
+}
+
+model DailyDua {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  title           String
+  arabicText      String        @map("arabic_text") @db.Text
+  transliteration String        @db.Text
+  translation     String        @db.Text
+  source          String?
+  status          ContentStatus @default(DRAFT)
+
+  categories DuaCategoryMap[]
+
+  @@map("daily_duas")
+}
+
+model DuaCategoryMap {
+  id         String @id @default(uuid(7)) @db.Uuid
+  duaId      String @map("dua_id") @db.Uuid
+  categoryId Int    @map("category_id")
+
+  dua      DailyDua    @relation(fields: [duaId], references: [id], onDelete: Cascade)
+  category DuaCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([duaId, categoryId])
+  @@map("dua_category_map")
+}
+
+model PrayerContent {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  name        String
+  prayerType  String        @map("prayer_type")
+  description String?       @db.Text
+  status      ContentStatus @default(DRAFT)
+
+  variants PrayerContentVariant[]
+
+  @@map("prayer_contents")
+}
+
+model PrayerContentVariant {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  prayerContentId String  @map("prayer_content_id") @db.Uuid
+  madhhab         String?
+  arabicText      String  @map("arabic_text") @db.Text
+  transliteration String  @db.Text
+  translation     String  @db.Text
+  source          String?
+
+  content PrayerContent @relation(fields: [prayerContentId], references: [id], onDelete: Cascade)
+
+  @@index([prayerContentId])
+  @@map("prayer_content_variants")
+}
+
+model HadithCollection {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  name            String
+  author          String
+  totalHadith     Int           @map("total_hadith")
+  source          String?
+  contentSourceId String?       @map("content_source_id") @db.Uuid
+  status          ContentStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(3)
+
+  contentSource ContentSource? @relation(fields: [contentSourceId], references: [id])
+  hadiths       Hadith[]
+
+  @@map("hadith_collections")
+}
+
+model Hadith {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  collectionId String  @map("collection_id") @db.Uuid
+  number       Int
+  arabicText   String  @map("arabic_text") @db.Text
+  translation  String  @db.Text
+  narrator     String?
+  reference    String?
+
+  collection   HadithCollection    @relation(fields: [collectionId], references: [id])
+  explanations HadithExplanation[]
+
+  @@unique([collectionId, number])
+  @@map("hadiths")
+}
+
+model HadithExplanation {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  hadithId    String  @map("hadith_id") @db.Uuid
+  explanation String  @db.Text
+  lessons     String  @db.Text
+  source      String?
+
+  hadith Hadith @relation(fields: [hadithId], references: [id], onDelete: Cascade)
+
+  @@index([hadithId])
+  @@map("hadith_explanations")
+}
+
+// Relasi polimorfik: content_id TIDAK punya foreign key ke tabel konten.
+// Backend wajib memvalidasi keberadaan konten (sesuai content_type) dalam transaksi yang sama saat insert.
+// Ayat memakai Bookmark; Asmaul Husna memakai AsmaulFavorite (keduanya punya FK langsung).
+model UserFavorite {
+  id          String              @id @default(uuid(7)) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  contentType FavoriteContentType @map("content_type")
+  contentId   String              @map("content_id") @db.Uuid
+  version     Int                 @default(1)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?           @map("deleted_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentType, contentId])
+  @@index([userId, updatedAt])
+  @@map("user_favorites")
+}
+
+// ============================================================
+// CONTENT SOURCE, DATASET & APPROVAL WORKFLOW
+// ============================================================
+
+// Lisensi dan atribusi setiap dataset, kitab, audio, font, dan model 3D.
+model ContentSource {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  name              String
+  publisher         String?
+  license           String?
+  attribution       String?   @db.Text
+  url               String?
+  licenseVerifiedAt DateTime? @map("license_verified_at") @db.Timestamptz(3)
+
+  quranEditions     QuranEdition[]
+  tafsirSources     TafsirSource[]
+  qaris             Qari[]
+  hadithCollections HadithCollection[]
+  datasetVersions   DatasetVersion[]
+
+  @@map("content_sources")
+}
+
+model DatasetVersion {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  datasetName     String        @map("dataset_name") @db.VarChar(80)
+  version         String        @db.VarChar(40)
+  checksum        String        @db.VarChar(128) // SHA-256 hex dari file dataset
+  recordCount     Int?          @map("record_count")
+  source          String?
+  contentSourceId String?       @map("content_source_id") @db.Uuid
+  status          ContentStatus @default(DRAFT)
+  importedAt      DateTime      @default(now()) @map("imported_at") @db.Timestamptz(3)
+  approvedById    String?       @map("approved_by_id") @db.Uuid
+  approvedAt      DateTime?     @map("approved_at") @db.Timestamptz(3)
+
+  contentSource ContentSource? @relation(fields: [contentSourceId], references: [id])
+  approvedBy    User?          @relation("DatasetApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+
+  @@unique([datasetName, version])
+  @@map("dataset_versions")
+}
+
+// Setiap perubahan konten oleh admin dibuat sebagai revisi: DRAFT -> REVIEW -> PUBLISHED.
+// Reviewer harus berbeda dari author (CHECK di SQL). Saat PUBLISHED, backend menerapkan payload
+// ke tabel target dalam satu transaksi dan menulis AdminAuditLog.
+model ContentRevision {
+  id          String         @id @default(uuid(7)) @db.Uuid
+  entityType  String         @map("entity_type") @db.VarChar(60)
+  entityId    String?        @map("entity_id") @db.VarChar(64) // NULL untuk CREATE
+  action      RevisionAction
+  payload     Json
+  status      ContentStatus  @default(DRAFT)
+  authorId    String         @map("author_id") @db.Uuid
+  reviewerId  String?        @map("reviewer_id") @db.Uuid
+  reviewNote  String?        @map("review_note") @db.Text
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reviewedAt  DateTime?      @map("reviewed_at") @db.Timestamptz(3)
+  publishedAt DateTime?      @map("published_at") @db.Timestamptz(3)
+
+  author   User  @relation("RevisionAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("RevisionReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@map("content_revisions")
+}
+
+// Append-only (UPDATE/DELETE diblokir trigger di SQL). Karena itu FK memakai Restrict:
+// admin yang punya jejak audit dinonaktifkan (is_active = false), bukan dihapus.
+model AdminAuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String   @map("entity_type") @db.VarChar(60)
+  entityId   String?  @map("entity_id") @db.VarChar(64)
+  metadata   Json?
+  ipAddress  String?  @map("ip_address") @db.Inet
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@map("admin_audit_logs")
+}
+
+// ============================================================
+// OFFLINE SYNC
+// ============================================================
+
+// Log perubahan personal yang diterima server.
+// Aturan: SEMUA penulisan data personal (termasuk via REST saat online) mencatat SyncChange
+// dalam transaksi yang sama, sehingga /sync/pull cukup membaca seq > cursor.
+model SyncChange {
+  id              String           @id @default(uuid(7)) @db.Uuid
+  seq             BigInt           @unique @default(autoincrement()) // cursor monoton untuk /sync/pull
+  userId          String           @map("user_id") @db.Uuid
+  sessionId       String?          @map("session_id") @db.Uuid // perangkat asal perubahan
+  entityType      SyncEntityType   @map("entity_type")
+  entityId        String           @map("entity_id") @db.Uuid
+  operation       SyncOperation
+  payload         Json
+  baseVersion     Int?             @map("base_version") // versi yang diedit klien; NULL untuk entitas baru
+  resultVersion   Int?             @map("result_version") // versi setelah diterapkan; NULL jika ditolak
+  idempotencyKey  String           @map("idempotency_key") @db.VarChar(100)
+  status          SyncChangeStatus
+  conflictReason  String?          @map("conflict_reason") @db.VarChar(200)
+  clientCreatedAt DateTime         @map("client_created_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session AuthSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Idempotency key unik per pengguna, bukan global.
+  @@unique([userId, idempotencyKey])
+  @@index([userId, seq])
+  @@index([userId, entityType, entityId])
+  @@map("sync_changes")
+}

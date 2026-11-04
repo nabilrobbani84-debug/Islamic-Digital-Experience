@@ -35,10 +35,23 @@ test.describe("Landing immersive", () => {
     await expect(page).toHaveURL(/\/quran$/);
   });
 
-  test("fallback 2D dipakai saat 3D dimatikan (?3d=off)", async ({ page }) => {
+  test("fallback 2D dipakai saat 3D dimatikan (?3d=off) dan three.js tidak diunduh", async ({ page }) => {
+    const scripts: string[] = [];
+    page.on("request", (req) => {
+      if (req.resourceType() === "script") scripts.push(req.url());
+    });
     await page.goto("/?3d=off");
     await expect(page.getByTestId("hero-fallback")).toBeVisible();
     await expect(page.locator("canvas")).toHaveCount(0);
+    await page.waitForLoadState("networkidle");
+    expect(scripts.filter((u) => /\/assets\/(three|r3f)-/.test(u))).toEqual([]);
+  });
+
+  test("scene 3D dimuat lazy saat WebGL tersedia", async ({ page }) => {
+    await page.goto("/");
+    const mode = await page.locator("[data-scene-mode]").first().getAttribute("data-scene-mode");
+    test.skip(mode !== "3d", "Browser CI tanpa WebGL memakai fallback 2D");
+    await expect(page.locator("canvas").first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("reduced motion tetap menampilkan konten", async ({ page }) => {

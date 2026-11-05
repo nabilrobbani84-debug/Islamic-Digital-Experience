@@ -59,6 +59,12 @@ e2e/              Playwright
 - **Offline-first.** Data personal ditulis ke IndexedDB lalu masuk antrean `pending_sync` dengan idempotency key; dikirim saat online. Konflik versi disimpan untuk ditinjau pengguna (Profil → Sinkronisasi), tidak ditimpa diam-diam.
 - **PWA.** Service worker hanya melakukan precache app shell dan aset statis. Respons `/api/*` (termasuk auth) tidak pernah di-cache oleh service worker.
 
+## Terhubung ke backend
+
+Mode default adalah `http` (backend NUR). Dengan backend berjalan, atur `VITE_API_PROXY_TARGET` di `.env.local`.
+`npx playwright test -c playwright.live.config.ts` menjalankan E2E terhadap backend nyata (build produksi dan `vite preview`);
+urutan lengkapnya ada di `.github/workflows/api.yml`.
+
 ## Batasan yang diketahui
 
 - Pengingat sholat memakai Notification API dan hanya berbunyi selama aplikasi terbuka (belum ada Web Push dari server).

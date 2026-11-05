@@ -12,6 +12,8 @@ Respons mengikuti envelope spesifikasi arsitektur (bagian 4.2):
 
 `401` memicu satu kali `POST /auth/refresh`, lalu request diulang. Jika refresh gagal, pengguna diarahkan ke `/login`.
 
+**Status:** seluruh endpoint di bawah ini sudah diimplementasikan di `apps/api` dan diuji (62 test integrasi + 7 E2E full-stack). Error memakai envelope `{ success:false, error:{ code, message, details } }`: 401 saat sesi tidak ada, 403 `CSRF_INVALID` saat token CSRF salah, 429 `RATE_LIMITED` dengan `Retry-After`.
+
 Kolom **Spec** menandai endpoint yang ada di spesifikasi arsitektur 4.1 (✓) atau **usulan** frontend yang perlu disepakati backend (P).
 
 | Spec | Method | Endpoint | Dipakai oleh |
@@ -43,6 +45,7 @@ Kolom **Spec** menandai endpoint yang ada di spesifikasi arsitektur 4.1 (✓) at
 | ✓ | POST | `/sync/push` | `{ changes: SyncChangeInput[] }` → `SyncPushResultItem[]` |
 | ✓ | GET | `/sync/pull?cursor=` | `SyncPullResult` (cursor = `SyncChange.seq`) |
 | ✓ | GET | `/admin/datasets` | Dataset |
+| P | POST | `/admin/datasets/:id/approve` | Menerbitkan dataset (REVIEW → PUBLISHED), mengarsipkan versi lama |
 | P | GET | `/admin/overview`, `/admin/content-sources`, `/admin/users`, `/admin/audit-logs`, `/admin/revisions`, `/admin/sync-status` | Panel admin |
 | P | PATCH | `/admin/users/:id` | `{ role }` (SUPER_ADMIN) atau `{ isActive }` |
 | P | POST | `/admin/revisions`, `/admin/revisions/:id/review` | Alur persetujuan konten |
@@ -53,4 +56,6 @@ Tipe lengkap: `apps/web/src/types/domain.ts`. Antarmuka adapter: `apps/web/src/s
 
 ## Catatan provider Al-Qur'an
 
-Spesifikasi frontend meminta data dari KiosAPI **melalui backend**, sedangkan spesifikasi arsitektur menetapkan *Zero Third-Party Runtime API* (dataset lokal). Frontend tidak bergantung pada keputusan ini: browser hanya memanggil backend NUR. Backend memilih provider (dataset lokal yang diimpor, atau KiosAPI di sisi server) dan memetakan hasilnya ke tipe di atas. Fitur yang tidak disediakan provider (misalnya segmen audio per ayat) dikembalikan sebagai `null`, dan UI menampilkan status "belum tersedia".
+Dokumentasi KiosAPI tidak dapat dibaca saat pengembangan (HTTP 403), jadi tidak ada adapter KiosAPI. Backend melayani
+dataset dari PostgreSQL setelah diimpor dan disetujui. Lihat `docs/AUDIT.md` bagian 4 dan `docs/DATA_INTEGRITY.md`.
+Fitur yang tidak disediakan sumber (mis. segmen audio per ayat) dikembalikan sebagai `null`, dan UI menampilkan "belum tersedia".

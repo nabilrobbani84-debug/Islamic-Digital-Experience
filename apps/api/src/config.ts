@@ -1,3 +1,4 @@
+import { Global, Module } from "@nestjs/common";
 import { z } from "zod";
 
 export const CONFIG = Symbol("CONFIG");
@@ -43,3 +44,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   return { ...parsed.data, cookieSecure: parsed.data.NODE_ENV === "production" };
 }
+
+/** Konfigurasi tersedia global: dibaca sekali saat modul dibuat. */
+@Global()
+@Module({
+  providers: [{ provide: CONFIG, useFactory: (): AppConfig => loadConfig() }],
+  exports: [CONFIG],
+})
+export class ConfigModule {}

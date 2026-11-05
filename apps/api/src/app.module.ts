@@ -8,7 +8,7 @@ import { AllExceptionsFilter, EnvelopeInterceptor } from "./common/envelope";
 import { Public } from "./common/http";
 import { createMailer, MAILER } from "./common/mailer";
 import { AuthGuard, CsrfGuard, RateLimitGuard, RateLimitService, RolesGuard } from "./common/security";
-import { CONFIG, loadConfig, type AppConfig } from "./config";
+import { CONFIG, ConfigModule } from "./config";
 import { KnowledgeController } from "./knowledge/knowledge.controller";
 import { PrismaModule, PrismaService } from "./prisma/prisma.service";
 import { QuranController } from "./quran/quran.controller";
@@ -29,10 +29,9 @@ class HealthController {
 }
 
 @Module({
-  imports: [PrismaModule],
+  imports: [ConfigModule, PrismaModule],
   controllers: [HealthController, AuthController, UsersController, QuranController, KnowledgeController, SyncController, AdminController],
   providers: [
-    { provide: CONFIG, useFactory: (): AppConfig => loadConfig() },
     { provide: MAILER, useFactory: createMailer, inject: [CONFIG] },
     RateLimitService,
     AuthService,

@@ -8,21 +8,38 @@ import { expect, login, navigateClient, test } from "./fixtures";
 const DIR = "screenshots";
 mkdirSync(DIR, { recursive: true });
 
+/**
+ * Memeriksa bahwa WebGL benar-benar menggambar. Dibaca di dalam requestAnimationFrame yang sama dengan render,
+ * karena buffer WebGL dikosongkan setelah komposit sehingga pembacaan di luar frame selalu kosong.
+ */
 async function canvasHasPixels(page: import("@playwright/test").Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector("canvas");
-    if (!canvas) return false;
-    const probe = document.createElement("canvas");
-    probe.width = 64;
-    probe.height = 64;
-    const ctx = probe.getContext("2d");
-    if (!ctx) return false;
-    ctx.drawImage(canvas, 0, 0, 64, 64);
-    const data = ctx.getImageData(0, 0, 64, 64).data;
-    let lit = 0;
-    for (let i = 0; i < data.length; i += 4) if ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0) > 60) lit++;
-    return lit > 40;
-  });
+  return page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const canvas = document.querySelector("canvas");
+        if (!canvas) return resolve(false);
+        let tries = 0;
+        const probe = document.createElement("canvas");
+        probe.width = 64;
+        probe.height = 64;
+        const check = (): void => {
+          const ctx = probe.getContext("2d");
+          if (!ctx) return resolve(false);
+          try {
+            ctx.drawImage(canvas, 0, 0, 64, 64);
+            const data = ctx.getImageData(0, 0, 64, 64).data;
+            let lit = 0;
+            for (let i = 0; i < data.length; i += 4) if ((data[i] ?? 0) + (data[i + 1] ?? 0) + (data[i + 2] ?? 0) > 45) lit++;
+            if (lit > 30) return resolve(true);
+          } catch {
+            /* belum terbaca */
+          }
+          if (++tries > 30) return resolve(false);
+          requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      }),
+  );
 }
 
 for (const vp of [

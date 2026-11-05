@@ -176,10 +176,14 @@ jobs:
         run: |
           docker run -d --name web --add-host api:127.0.0.1 -p 8081:80 nur-web:ci
           for i in $(seq 1 20); do curl -fsS http://localhost:8081/healthz && break; sleep 1; done
-          curl -fsS http://localhost:8081/ | grep -q '<div id="root">'
-          curl -fsS http://localhost:8081/quran/1 | grep -q '<div id="root">'
-          curl -fsSI http://localhost:8081/ | grep -i 'content-security-policy' >/dev/null
-          curl -fsSI http://localhost:8081/sw.js | grep -i 'cache-control: no-cache' >/dev/null
+          echo; curl -fsS http://localhost:8081/ -o /tmp/index.html -D /tmp/index.headers
+          cat /tmp/index.headers; head -c 600 /tmp/index.html; echo
+          grep -q 'id="root"' /tmp/index.html
+          curl -fsS http://localhost:8081/quran/1 | grep -q 'id="root"'
+          grep -qi '^content-security-policy:' /tmp/index.headers
+          grep -qi '^x-content-type-options: nosniff' /tmp/index.headers
+          curl -fsSI http://localhost:8081/sw.js | grep -qi '^cache-control: no-cache'
+          curl -fsSI "http://localhost:8081/assets/$(grep -o 'index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)" | grep -qi 'immutable'
       - name: API image refuses to start with unsafe production config
         run: |
           set +e

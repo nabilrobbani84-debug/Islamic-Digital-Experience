@@ -104,6 +104,7 @@ export interface NurApi {
   admin: {
     overview(): Promise<AdminOverview>;
     datasets(): Promise<AdminDataset[]>;
+    approveDataset(id: string): Promise<AdminDataset>;
     contentSources(): Promise<AdminContentSource[]>;
     users(): Promise<AdminUser[]>;
     updateUserRole(id: string, role: UserRole): Promise<AdminUser>;

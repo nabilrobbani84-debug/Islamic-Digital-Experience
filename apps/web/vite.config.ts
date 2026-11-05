@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: apiOrigin ? { "/api": { target: apiOrigin, changeOrigin: false } } : undefined,
     },
-    preview: { port: 4173 },
+    preview: { port: 4173, proxy: apiOrigin ? { "/api": { target: apiOrigin, changeOrigin: false } } : undefined },
     build: {
       target: "es2022",
       sourcemap: true,

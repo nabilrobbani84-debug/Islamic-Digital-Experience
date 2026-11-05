@@ -81,7 +81,7 @@ export default function IslamicHeroScene({ tier, progress, reducedMotion, active
       <GoldParticles count={config.particles} animated={animated} />
       <FloatingGeometry count={config.floating} animated={animated} />
 
-      <ScrollCameraController keyframes={HERO_KEYFRAMES} progress={progress} parallax={animated} idle={animated} damping={reducedMotion ? 6 : 2.2} />
+      <ScrollCameraController keyframes={HERO_KEYFRAMES} progress={progress} parallax={animated} idle={animated} intro={animated} damping={reducedMotion ? 6 : 2.2} />
     </Canvas>
   );
 }

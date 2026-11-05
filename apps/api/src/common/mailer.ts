@@ -1,4 +1,5 @@
 import { Logger } from "@nestjs/common";
+import { appendFileSync } from "node:fs";
 import nodemailer from "nodemailer";
 import type { AppConfig } from "../config";
 
@@ -31,6 +32,14 @@ class LogMailer implements Mailer {
   }
 }
 
+/** Khusus E2E: menulis email sebagai JSON-lines agar test dapat membaca tautan. Produksi menolak transport ini lewat konfigurasi. */
+class FileMailer implements Mailer {
+  constructor(private readonly file: string) {}
+  async send(message: MailMessage): Promise<void> {
+    appendFileSync(this.file, `${JSON.stringify(message)}\n`);
+  }
+}
+
 class SmtpMailer implements Mailer {
   private readonly transport;
   constructor(
@@ -50,6 +59,8 @@ export function createMailer(cfg: AppConfig): Mailer {
       return new SmtpMailer(cfg.SMTP_URL ?? "", cfg.MAIL_FROM);
     case "memory":
       return new MemoryMailer();
+    case "file":
+      return new FileMailer(cfg.MAIL_OUTBOX_FILE ?? "");
     default:
       return new LogMailer();
   }

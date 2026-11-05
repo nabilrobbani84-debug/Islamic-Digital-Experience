@@ -22,6 +22,8 @@ export interface PendingSyncRow extends SyncChangeInput {
   status: LocalSyncStatus;
   attempts: number;
   lastError?: string | null;
+  /** Versi server saat terjadi konflik; dipakai sebagai basis ketika pengguna memilih versi perangkat ini. */
+  serverVersion?: number | null;
 }
 
 export interface CachedSurahDetail {

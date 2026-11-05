@@ -394,6 +394,11 @@ export function createMockApi(): NurApi {
         requireAdmin();
         return [];
       },
+      async approveDataset() {
+        await delay();
+        requireAdmin();
+        throw new ApiError(404, "NOT_FOUND", "Tidak ada dataset pada adapter mock");
+      },
       async contentSources() {
         await delay();
         requireAdmin();

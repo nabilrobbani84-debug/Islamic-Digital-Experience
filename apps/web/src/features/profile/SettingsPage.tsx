@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, Bell, Box, Download, Palette, Type } from "lucide-react";
+import { ArrowRight, Bell, Box, Download, MapPin, Palette, Type } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Segmented } from "@/components/ui/Segmented";
 import { Switch } from "@/components/ui/Switch";
@@ -7,11 +9,15 @@ import { PageHeader } from "@/components/ui/misc";
 import { ARABIC_FONT_RANGE, TRANSLATION_FONT_RANGE, usePreferences } from "@/stores/preferences";
 import { detectWebGL } from "@/lib/device";
 import { toast } from "@/stores/ui";
+import { usePrayerSettings } from "@/stores/prayer-settings";
+import { LocationDialog } from "@/features/prayer/components/LocationDialog";
 import { notificationsSupported } from "@/features/prayer/PrayerReminders";
 
 export default function SettingsPage() {
   const prefs = usePreferences();
   const webgl = detectWebGL();
+  const location = usePrayerSettings((st) => st.location);
+  const [locationOpen, setLocationOpen] = useState(false);
 
   const toggleNotifications = async (on: boolean): Promise<void> => {
     if (!on) {
@@ -34,6 +40,16 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader eyebrow="Pengaturan" title="Pengaturan" description="Preferensi tersimpan di perangkat ini." />
       <div className="space-y-5">
+        <Card>
+          <CardHeader title="Lokasi & perhitungan ibadah" icon={<MapPin className="size-5" />} description="Dipakai untuk waktu sholat, kiblat, dan kalender. Dihitung lokal di perangkat." />
+          <p className="text-sm">{location ? `${location.name} · ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)} · ${location.timezone}` : "Lokasi belum diatur"}</p>
+          <div className="mt-3">
+            <Button variant="outline" size="sm" onClick={() => setLocationOpen(true)}>
+              {location ? "Ubah lokasi" : "Atur lokasi"}
+            </Button>
+          </div>
+          <LocationDialog open={locationOpen} onClose={() => setLocationOpen(false)} />
+        </Card>
         <Card>
           <CardHeader title="Tampilan" icon={<Palette className="size-5" />} />
           <div className="flex items-center justify-between gap-4 py-2">

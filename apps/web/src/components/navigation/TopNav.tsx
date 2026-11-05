@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Command, LogOut, Moon, Search, Settings, Shield, Sun, User as UserIcon } from "lucide-react";
 import { DHIKR_NAV, KNOWLEDGE_GROUP, KNOWLEDGE_NAV, PRIMARY_NAV } from "@/app/navigation";
 import { IconButton } from "@/components/ui/IconButton";
+import { SyncStatusBadge } from "@/components/feedback/SyncStatusBadge";
 import { NurLogo } from "./NurLogo";
 import { useAuth, can } from "@/stores/auth";
 import { usePreferences } from "@/stores/preferences";
@@ -194,6 +195,7 @@ export function TopNav({ transparent = false }: { transparent?: boolean }) {
             </kbd>
           </button>
           <IconButton label="Buka pencarian cepat" icon={<Search className="size-5" />} onClick={() => setCommandOpen(true)} className="md:hidden" />
+          <SyncStatusBadge compact />
           <ThemeToggle />
           <UserMenu />
         </div>

@@ -14,7 +14,8 @@ const schema = z
     WEB_ORIGIN: z.string().default("http://localhost:5173"),
     APP_BASE_URL: z.string().default("http://localhost:5173"),
     TRUST_PROXY: z.coerce.number().int().min(0).default(0),
-    MAIL_TRANSPORT: z.enum(["log", "smtp", "memory"]).default("log"),
+    MAIL_TRANSPORT: z.enum(["log", "smtp", "memory", "file"]).default("log"),
+    MAIL_OUTBOX_FILE: z.string().optional(),
     MAIL_FROM: z.string().default("NUR <no-reply@nur.local>"),
     SMTP_URL: z.string().optional(),
     AUTH_RATE_LIMIT: z.coerce.number().int().min(1).default(10),
@@ -25,6 +26,9 @@ const schema = z
   .superRefine((env, ctx) => {
     if (env.MAIL_TRANSPORT === "smtp" && !env.SMTP_URL) {
       ctx.addIssue({ code: "custom", path: ["SMTP_URL"], message: "SMTP_URL wajib jika MAIL_TRANSPORT=smtp" });
+    }
+    if (env.MAIL_TRANSPORT === "file" && !env.MAIL_OUTBOX_FILE) {
+      ctx.addIssue({ code: "custom", path: ["MAIL_OUTBOX_FILE"], message: "MAIL_OUTBOX_FILE wajib jika MAIL_TRANSPORT=file" });
     }
     if (env.NODE_ENV === "production" && env.MAIL_TRANSPORT !== "smtp") {
       ctx.addIssue({ code: "custom", path: ["MAIL_TRANSPORT"], message: "Produksi wajib memakai MAIL_TRANSPORT=smtp" });

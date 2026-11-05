@@ -43,6 +43,13 @@ export function SceneBoundary({ tier, fallback, children, className }: SceneBoun
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(true);
   const [lost, setLost] = useState(false);
+  const [tabVisible, setTabVisible] = useState(() => typeof document === "undefined" || document.visibilityState !== "hidden");
+
+  useEffect(() => {
+    const onVisibility = (): void => setTabVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -69,7 +76,7 @@ export function SceneBoundary({ tier, fallback, children, className }: SceneBoun
     <div ref={ref} className={className} aria-hidden={use3D ? true : undefined} data-scene-mode={use3D ? "3d" : "2d"}>
       {use3D ? (
         <SceneErrorBoundary fallback={fallback} onError={() => setLost(true)}>
-          <Suspense fallback={fallback}>{children(active)}</Suspense>
+          <Suspense fallback={fallback}>{children(active && tabVisible)}</Suspense>
         </SceneErrorBoundary>
       ) : (
         fallback

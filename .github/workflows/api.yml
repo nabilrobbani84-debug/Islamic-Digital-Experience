@@ -42,53 +42,116 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Prisma validate
         run: npx prisma validate
         working-directory: apps/api
 
-      - name: Diff schema to SQL (bootstrap artifact)
-        run: |
-          mkdir -p /tmp/artifacts
-          npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > /tmp/artifacts/init.sql
-          wc -l /tmp/artifacts/init.sql
-          cp ../../package-lock.json /tmp/artifacts/package-lock.json
-        working-directory: apps/api
-
-      - name: Upload bootstrap artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-bootstrap
-          path: /tmp/artifacts
-          retention-days: 7
-
       - name: Apply migrations
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
         run: npx prisma migrate deploy
         working-directory: apps/api
 
+      - name: Migration drift check (schema vs migrations)
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+        working-directory: apps/api
+
       - name: Verify custom constraints are present
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
         run: |
           psql "$DATABASE_URL" -tAc "select count(*) from pg_constraint where conname in ('verse_number_positive','zakat_amount_nonnegative','valid_audio_segment','dataset_versions_published_requires_approval')" | grep -qx 4
           psql "$DATABASE_URL" -tAc "select count(*) from pg_indexes where indexname like 'idx_custom_%'" | grep -qx 4
           psql "$DATABASE_URL" -tAc "select count(*) from pg_trigger where tgname='admin_audit_logs_append_only'" | grep -qx 1
 
       - name: Typecheck
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
         run: npm run typecheck
         working-directory: apps/api
 
-      - name: Build
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
-        run: npm run build
-        working-directory: apps/api
-
       - name: Integration tests
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
         run: npm test
         working-directory: apps/api
+
+  fullstack:
+    name: Full-stack E2E (web + API + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nur
+          POSTGRES_PASSWORD: nur
+          POSTGRES_DB: nur_live
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nur -d nur_live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://nur:nur@localhost:5432/nur_live
+      JWT_SECRET: live-e2e-secret-live-e2e-secret-live-e2e
+      NODE_ENV: test
+      PORT: 3000
+      WEB_ORIGIN: http://localhost:4173
+      APP_BASE_URL: http://localhost:4173
+      MAIL_TRANSPORT: file
+      MAIL_OUTBOX_FILE: /tmp/nur-outbox.jsonl
+      AUTH_RATE_LIMIT: 200
+      SEED_ADMIN_EMAIL: admin@live.nur
+      SEED_ADMIN_PASSWORD: LiveAdmin-12345
+      VITE_API_PROXY_TARGET: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build API and apply migrations
+        run: |
+          npm run build
+          npx prisma migrate deploy
+        working-directory: apps/api
+
+      - name: Seed admin and import fixture dataset (REVIEW, belum diterbitkan)
+        run: |
+          node dist/scripts/seed-admin.js
+          node dist/scripts/import-quran.js test/fixtures/e2e-dataset.json --partial
+        working-directory: apps/api
+
+      - name: Start API
+        run: |
+          node dist/src/main.js > /tmp/api.out 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/v1/health && break; sleep 1; done
+        working-directory: apps/api
+
+      - name: Build web (production, no mock)
+        run: npm run build -w @nur/web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Live E2E
+        run: npx playwright test -c playwright.live.config.ts
+        working-directory: apps/web
+
+      - name: API log
+        if: always()
+        run: tail -60 /tmp/api.out || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-live
+          path: apps/web/playwright-report-live
+          retention-days: 7

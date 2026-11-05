@@ -21,21 +21,26 @@ export interface ScrollCameraControllerProps {
   damping?: number;
   /** Ayunan kamera idle yang sangat halus. */
   idle?: boolean;
+  /** Animasi pembukaan sinematik (kamera turun dan mendekat) selama beberapa detik pertama. */
+  intro?: boolean;
 }
 
 const smooth = (t: number): number => t * t * (3 - 2 * t);
+const INTRO_SECONDS = 3.2;
 
 /**
  * Menggerakkan kamera di sepanjang keyframe berdasarkan progres scroll,
  * dengan damping agar tidak pernah bergerak terlalu cepat.
  */
-export function ScrollCameraController({ keyframes, progress, parallax = true, damping = 2.2, idle = true }: ScrollCameraControllerProps) {
+export function ScrollCameraController({ keyframes, progress, parallax = true, damping = 2.2, idle = true, intro = false }: ScrollCameraControllerProps) {
   const camera = useThree((s) => s.camera);
   const desiredPos = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
   const lookAt = useRef(new Vector3(...(keyframes[0]?.target ?? [0, 0, 0])));
   const tmpA = useRef(new Vector3());
   const tmpB = useRef(new Vector3());
+
+  const introStart = useRef<number | null>(null);
 
   useFrame((state, delta) => {
     if (keyframes.length === 0) return;
@@ -57,6 +62,14 @@ export function ScrollCameraController({ keyframes, progress, parallax = true, d
       const t = state.clock.elapsedTime;
       desiredPos.current.y += Math.sin(t * 0.25) * 0.08;
       desiredPos.current.x += Math.cos(t * 0.18) * 0.1;
+    }
+
+    if (intro) {
+      introStart.current ??= state.clock.elapsedTime;
+      const t = Math.min(1, (state.clock.elapsedTime - introStart.current) / INTRO_SECONDS);
+      const remaining = (1 - t) ** 3;
+      desiredPos.current.y += remaining * 7;
+      desiredPos.current.z += remaining * 16;
     }
 
     const d = Math.min(delta, 0.1);

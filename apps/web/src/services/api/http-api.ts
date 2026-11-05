@@ -93,6 +93,7 @@ export function createHttpApi(baseUrl: string): NurApi {
     admin: {
       overview: () => get<AdminOverview>("/admin/overview"),
       datasets: () => get<AdminDataset[]>("/admin/datasets"),
+      approveDataset: (id) => send<AdminDataset>("POST", `/admin/datasets/${encodeURIComponent(id)}/approve`),
       contentSources: () => get<AdminContentSource[]>("/admin/content-sources"),
       users: () => get<AdminUser[]>("/admin/users"),
       updateUserRole: (id, role) => send<AdminUser>("PATCH", `/admin/users/${encodeURIComponent(id)}`, { role }),

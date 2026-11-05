@@ -21,7 +21,7 @@ export async function toggleBookmark(surahNumber: number, verseNumber: number): 
   const timestamp = nowIso();
   const bookmark: Bookmark = existing
     ? { ...existing, deletedAt: null, updatedAt: timestamp }
-    : { id: crypto.randomUUID(), surahNumber, verseNumber, note: null, createdAt: timestamp, updatedAt: timestamp, version: 0 };
+    : { id: `${surahNumber}:${verseNumber}`, surahNumber, verseNumber, note: null, createdAt: timestamp, updatedAt: timestamp, version: 0 };
   await db.bookmarks.put(bookmark);
   await enqueueChange("BOOKMARK", bookmark.id, "UPSERT", { surahNumber, verseNumber, note: bookmark.note ?? null }, existing ? existing.version : null);
   return true;

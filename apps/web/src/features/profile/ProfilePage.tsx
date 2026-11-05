@@ -280,7 +280,7 @@ function SyncTab() {
               </p>
               <p className="text-xs text-muted">Data ini diubah di perangkat lain. Pilih versi yang dipertahankan.</p>
               <div className="mt-2 flex gap-2">
-                <Button size="sm" onClick={() => c.seq !== undefined && void retryConflict(c.seq, (c.baseVersion ?? 0) + 1)}>
+                <Button size="sm" onClick={() => c.seq !== undefined && void retryConflict(c.seq, c.serverVersion ?? c.baseVersion ?? 0)}>
                   Pakai versi perangkat ini
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => c.seq !== undefined && void discardChange(c.seq)}>

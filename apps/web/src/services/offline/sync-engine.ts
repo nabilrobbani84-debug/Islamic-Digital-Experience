@@ -1,3 +1,4 @@
+import { create } from "zustand";
 import { api, isApiError } from "@/services/api";
 import type {
   Bookmark,
@@ -9,7 +10,7 @@ import type {
   SyncPullChange,
   ZakatRecord,
 } from "@/types/domain";
-import { db, getSetting, setSetting, type PendingSyncRow } from "./db";
+import { db, getSetting, setSetting, type FavoriteContentType, type PendingSyncRow } from "./db";
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 50;
@@ -18,13 +19,17 @@ export type SyncState = "idle" | "syncing" | "offline" | "error";
 
 type Listener = (state: SyncState) => void;
 
+/** Status sinkronisasi untuk UI (indikator online/offline/syncing/success/failed/conflict). */
+export const useSyncStatus = create<{ state: SyncState; lastSyncAt: string | null }>()(() => ({ state: "idle", lastSyncAt: null }));
+
 const listeners = new Set<Listener>();
 let state: SyncState = "idle";
 let flushing: Promise<void> | null = null;
 let started = false;
 
-function setState(next: SyncState): void {
+function setState(next: SyncState, succeeded = false): void {
   state = next;
+  useSyncStatus.setState(succeeded ? { state: next, lastSyncAt: new Date().toISOString() } : { state: next });
   listeners.forEach((l) => l(next));
 }
 
@@ -116,7 +121,7 @@ export function flushSync(): Promise<void> {
               if (result.resultVersion) await updateLocalVersion(row.entityType, row.entityId, result.resultVersion);
             } else if (result.status === "CONFLICT") {
               // Data catatan tidak boleh ditimpa diam-diam: simpan sebagai konflik untuk ditinjau pengguna.
-              await db.pending_sync.update(row.seq, { status: "CONFLICT", lastError: result.reason ?? "CONFLICT" });
+              await db.pending_sync.update(row.seq, { status: "CONFLICT", lastError: result.reason ?? "CONFLICT", serverVersion: result.resultVersion ?? null });
             } else {
               await db.pending_sync.update(row.seq, { status: "FAILED", attempts: MAX_ATTEMPTS, lastError: result.reason ?? "REJECTED" });
             }
@@ -125,7 +130,7 @@ export function flushSync(): Promise<void> {
         if (batch.length < BATCH_SIZE) break;
       }
       await pullChanges();
-      setState("idle");
+      setState("idle", true);
     } catch (error) {
       if (isApiError(error) && error.isNetwork) {
         setState("offline");
@@ -152,7 +157,7 @@ export async function pullChanges(): Promise<number> {
   for (let page = 0; page < 20; page++) {
     const result = await api.sync.pull(cursor);
     const pendingIds = new Set((await db.pending_sync.toArray()).map((r) => `${r.entityType}:${r.entityId}`));
-    await db.transaction("rw", [db.bookmarks, db.reading_progress, db.reading_history, db.dhikr_sessions, db.zakat_history, db.prayer_locations, db.app_settings], async () => {
+    await db.transaction("rw", [db.bookmarks, db.reading_progress, db.reading_history, db.dhikr_sessions, db.zakat_history, db.prayer_locations, db.favorites, db.app_settings], async () => {
       for (const change of result.changes) {
         if (pendingIds.has(`${change.entityType}:${change.entityId}`)) continue;
         await applyRemoteChange(change);
@@ -167,6 +172,13 @@ export async function pullChanges(): Promise<number> {
 }
 
 async function applyRemoteChange(change: SyncPullChange): Promise<void> {
+  if (change.entityType === "USER_FAVORITE") {
+    const { contentType, contentId } = change.payload as { contentType?: FavoriteContentType; contentId?: string };
+    if (!contentType || !contentId) return;
+    if (change.operation === "DELETE") await db.favorites.delete(change.entityId);
+    else await db.favorites.put({ id: change.entityId, contentType, contentId, createdAt: String(change.payload.createdAt ?? new Date().toISOString()) });
+    return;
+  }
   const payload = { ...change.payload, id: change.entityId, version: change.version };
   switch (change.entityType) {
     case "BOOKMARK":

@@ -16,7 +16,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: "h-9 px-3.5 text-sm gap-1.5 rounded-xl",
+  sm: "h-9 px-3.5 text-sm gap-1.5 rounded-xl pointer-coarse:h-11",
   md: "h-11 px-5 text-sm gap-2 rounded-xl",
   lg: "h-13 px-7 text-base gap-2.5 rounded-2xl",
   icon: "h-11 w-11 rounded-xl",

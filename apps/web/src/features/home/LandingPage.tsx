@@ -53,12 +53,15 @@ const CHAPTERS = [
 
 function Chapter({ progress, index }: { progress: MotionValue<number>; index: number }) {
   const chapter = CHAPTERS[index]!;
+  const [a, , , d] = chapter.range;
   const input = [...chapter.range];
   const opacity = useTransform(progress, input, [...chapter.out]);
   const y = useTransform(progress, input, chapter.out.map((o, i) => (o === 1 ? 0 : i === 0 ? 40 : -40)));
   const pointerEvents = useTransform(opacity, (o) => (o > 0.5 ? "auto" : "none"));
+  // Disembunyikan sepenuhnya di luar rentangnya agar tidak pernah bertumpuk dengan bab lain.
+  const visibility = useTransform(progress, (v) => (v < a - 0.004 || v > d + 0.004 ? "hidden" : "visible"));
   return (
-    <motion.article style={{ opacity, y, pointerEvents }} className="absolute inset-x-0 bottom-[14%] mx-auto max-w-7xl px-5 sm:px-8 md:bottom-auto md:top-1/2 md:-translate-y-1/2">
+    <motion.article style={{ opacity, y, pointerEvents, visibility }} className="absolute inset-x-0 bottom-[14%] mx-auto max-w-7xl px-5 sm:px-8 md:bottom-auto md:top-1/2 md:-translate-y-1/2">
       <div className="nur-glass max-w-lg rounded-3xl p-6 sm:p-8">
         <p className="text-xs font-semibold tracking-[0.24em] text-gold-text uppercase">{chapter.eyebrow}</p>
         <h2 className="mt-3 text-2xl font-bold text-fg sm:text-3xl">{chapter.title}</h2>
@@ -91,8 +94,9 @@ function HeroIntro({ progress }: { progress: MotionValue<number> }) {
   const opacity = useTransform(progress, [0, 0.12, 0.2], [1, 1, 0]);
   const y = useTransform(progress, [0, 0.2], [0, -60]);
   const pointerEvents = useTransform(opacity, (o) => (o > 0.4 ? "auto" : "none"));
+  const visibility = useTransform(progress, (v) => (v > 0.21 ? "hidden" : "visible"));
   return (
-    <motion.div style={{ opacity, y, pointerEvents }} className="absolute inset-0 flex items-center">
+    <motion.div style={{ opacity, y, pointerEvents, visibility }} className="absolute inset-0 flex items-end pb-20 md:items-center md:pb-0">
       <div className="mx-auto w-full max-w-7xl px-5 pt-16 sm:px-8">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="max-w-2xl">
           <div className="mb-6 flex items-center gap-3">
@@ -147,7 +151,7 @@ export default function LandingPage() {
             <SceneBoundary tier={tier} className="absolute inset-0" label="Ilustrasi masjid" fallback={<HeroFallback2D />}>
               {(active) => tier !== "none" && <LazyIslamicHeroScene tier={tier} progress={scrollYProgress} reducedMotion={reducedMotion} active={active} />}
             </SceneBoundary>
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-night/85 via-night/30 to-transparent" aria-hidden />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-night/95 via-night/45 to-transparent md:bg-gradient-to-r md:from-night/80 md:via-night/25 md:to-transparent" aria-hidden />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-night to-transparent" aria-hidden />
             <HeroIntro progress={scrollYProgress} />
             {CHAPTERS.slice(1).map((_, i) => (

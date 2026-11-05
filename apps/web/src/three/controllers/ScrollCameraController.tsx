@@ -23,6 +23,8 @@ export interface ScrollCameraControllerProps {
   idle?: boolean;
   /** Animasi pembukaan sinematik (kamera turun dan mendekat) selama beberapa detik pertama. */
   intro?: boolean;
+  /** Geser komposisi menurut rasio layar (mis. dorong scene ke kanan agar teks di kiri tetap terbaca). */
+  compose?: (aspect: number) => { x: number; y: number; z: number };
 }
 
 const smooth = (t: number): number => t * t * (3 - 2 * t);
@@ -32,8 +34,9 @@ const INTRO_SECONDS = 3.2;
  * Menggerakkan kamera di sepanjang keyframe berdasarkan progres scroll,
  * dengan damping agar tidak pernah bergerak terlalu cepat.
  */
-export function ScrollCameraController({ keyframes, progress, parallax = true, damping = 2.2, idle = true, intro = false }: ScrollCameraControllerProps) {
+export function ScrollCameraController({ keyframes, progress, parallax = true, damping = 2.2, idle = true, intro = false, compose }: ScrollCameraControllerProps) {
   const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
   const desiredPos = useRef(new Vector3());
   const desiredTarget = useRef(new Vector3());
   const lookAt = useRef(new Vector3(...(keyframes[0]?.target ?? [0, 0, 0])));
@@ -53,6 +56,15 @@ export function ScrollCameraController({ keyframes, progress, parallax = true, d
 
     desiredPos.current.lerpVectors(tmpA.current.set(...a.position), tmpB.current.set(...b.position), local);
     desiredTarget.current.lerpVectors(tmpA.current.set(...a.target), tmpB.current.set(...b.target), local);
+
+    if (compose) {
+      const c = compose(size.width / Math.max(1, size.height));
+      desiredPos.current.x += c.x;
+      desiredPos.current.y += c.y;
+      desiredPos.current.z += c.z;
+      desiredTarget.current.x += c.x;
+      desiredTarget.current.y += c.y;
+    }
 
     if (parallax) {
       desiredPos.current.x += state.pointer.x * 0.9;

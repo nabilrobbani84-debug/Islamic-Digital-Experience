@@ -19,6 +19,8 @@ test.describe("Landing immersive", () => {
     await expect
       .poll(async () => Number(await chapter.evaluate((el) => getComputedStyle(el.closest("article") ?? el).opacity)), { timeout: 10_000 })
       .toBeGreaterThan(0.6);
+    // Hero tidak boleh bertumpuk dengan kartu bab: disembunyikan sepenuhnya (bukan sekadar memudar).
+    await expect(page.getByRole("heading", { level: 1, name: /Your Spiritual Journey/ })).toBeHidden();
     // Hero sudah memudar.
     await expect
       .poll(async () => Number(await page.getByRole("heading", { level: 1 }).evaluate((el) => getComputedStyle(el.closest(".absolute") ?? el).opacity)))

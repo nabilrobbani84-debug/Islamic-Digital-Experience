@@ -95,7 +95,7 @@ function Dial({ bearing, heading, reducedMotion }: { bearing: number; heading: n
 /** Kompas kiblat 3D. Arah pandang perangkat ditandai segitiga tetap di atas layar. */
 export default function QiblaCompass3D({ tier, bearing, heading, reducedMotion, active }: QiblaCompass3DProps) {
   return (
-    <Canvas dpr={tier === "high" ? [1, 2] : [1, 1.5]} frameloop={active ? "always" : "demand"} gl={{ antialias: tier !== "low", alpha: true }} camera={{ position: [0, 5.4, 2.6], fov: 40 }} onCreated={({ camera }) => camera.lookAt(0, 0, -0.2)} style={{ width: "100%", height: "100%" }}>
+    <Canvas dpr={tier === "high" ? [1, 2] : [1, 1.5]} frameloop={active ? "always" : "demand"} gl={{ antialias: tier !== "low", alpha: true }} camera={{ position: [0, 7.6, 3.6], fov: 40 }} onCreated={({ camera }) => camera.lookAt(0, 0, -0.5)} style={{ width: "100%", height: "100%" }}>
       <ambientLight intensity={0.6} />
       <directionalLight position={[2, 6, 3]} intensity={1.3} />
       <pointLight position={[0, 2, 0]} intensity={6} distance={6} color={PALETTE.gold} />

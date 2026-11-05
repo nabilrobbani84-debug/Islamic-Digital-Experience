@@ -20,6 +20,17 @@ export const HERO_KEYFRAMES: readonly CameraKeyframe[] = [
   { position: [0, 13, 18], target: [0, 4, 0] },
 ];
 
+/**
+ * Komposisi hero menurut rasio layar:
+ * - landscape lebar: masjid digeser ke kanan, teks di kiri tidak menimpa bangunan;
+ * - portrait: kamera mundur dan turun sehingga masjid berada di separuh atas, teks di separuh bawah.
+ */
+export function composeHero(aspect: number): { x: number; y: number; z: number } {
+  if (aspect >= 1.25) return { x: -4.2, y: 0, z: 0 };
+  if (aspect < 0.8) return { x: 0, y: -3.4, z: 11 };
+  return { x: 0, y: -1.6, z: 4 };
+}
+
 export interface IslamicHeroSceneProps {
   tier: Exclude<RenderTier, "none">;
   progress: ScrollProgressSource | null;
@@ -49,10 +60,10 @@ export default function IslamicHeroScene({ tier, progress, reducedMotion, active
     >
       <PerformanceMonitor
         bounds={() => (tier === "high" ? [50, 60] : [28, 45])}
-        onDecline={() => setDpr((d) => Math.max(0.75, d - 0.25))}
+        onDecline={() => setDpr((d) => Math.max(1, d - 0.25))}
         onIncline={() => setDpr((d) => Math.min(config.dpr[1], d + 0.25))}
         flipflops={3}
-        onFallback={() => setDpr(0.75)}
+        onFallback={() => setDpr(1)}
       />
       <color attach="background" args={[PALETTE.night]} />
       <fog attach="fog" args={[PALETTE.night, 28, 95]} />
@@ -81,7 +92,7 @@ export default function IslamicHeroScene({ tier, progress, reducedMotion, active
       <GoldParticles count={config.particles} animated={animated} />
       <FloatingGeometry count={config.floating} animated={animated} />
 
-      <ScrollCameraController keyframes={HERO_KEYFRAMES} progress={progress} parallax={animated} idle={animated} intro={animated} damping={reducedMotion ? 6 : 2.2} />
+      <ScrollCameraController keyframes={HERO_KEYFRAMES} progress={progress} parallax={animated} idle={animated} intro={animated} compose={composeHero} damping={reducedMotion ? 6 : 2.2} />
     </Canvas>
   );
 }

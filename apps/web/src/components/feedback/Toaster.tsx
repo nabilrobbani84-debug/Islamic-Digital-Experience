@@ -9,7 +9,7 @@ export function Toaster() {
   const toasts = useUi((s) => s.toasts);
   const dismiss = useUi((s) => s.dismissToast);
   return (
-    <div aria-live="polite" aria-relevant="additions" className="pointer-events-none fixed inset-x-0 top-3 z-[90] flex flex-col items-center gap-2 px-3 sm:top-auto sm:right-4 sm:bottom-6 sm:left-auto sm:items-end">
+    <div aria-live="polite" aria-relevant="additions" className="pointer-events-none fixed inset-x-0 top-[4.75rem] z-[90] flex flex-col items-center gap-2 px-3 sm:top-auto sm:right-4 sm:bottom-6 sm:left-auto sm:items-end">
       <AnimatePresence initial={false}>
         {toasts.map((t) => {
           const Icon = ICONS[t.tone];

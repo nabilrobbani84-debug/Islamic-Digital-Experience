@@ -13,7 +13,7 @@
     "start:dev": "npm run build && node dist/src/main.js",
     "pretypecheck": "prisma generate",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test --test-concurrency=1 \"dist/test/**/*.test.js\"",
+    "test": "npm run build && node --test --test-reporter=spec --test-concurrency=1 \"dist/test/**/*.test.js\"",
     "db:validate": "prisma validate",
     "db:generate": "prisma generate",
     "db:deploy": "prisma migrate deploy",

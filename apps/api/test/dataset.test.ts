@@ -14,7 +14,7 @@ const base = (): QuranDataset =>
       { number: 2, nameArabic: "ب", nameLatin: "Dua", revelationType: "MADANIYAH", verses: [{ number: 1, textUthmani: "ج", page: 2, juz: 1 }] },
     ],
     juzs: [{ number: 1, startSurah: 1, startVerse: 1, endSurah: 2, endVerse: 1 }],
-    translations: [{ name: "T", language: "id", version: "1", source: { name: "S", license: "LIC-TEST" }, items: [{ surah: 1, verse: 1, text: "a" }, { surah: 1, verse: 2, text: "b" }, { surah: 2, verse: 1, text: "c" }] }],
+    translations: [{ name: "Terjemahan Uji", language: "id", version: "1", source: { name: "Sumber Uji", license: "LIC-TEST" }, items: [{ surah: 1, verse: 1, text: "a" }, { surah: 1, verse: 2, text: "b" }, { surah: 2, verse: 1, text: "c" }] }],
   });
 
 describe("validator dataset Al-Qur'an", () => {

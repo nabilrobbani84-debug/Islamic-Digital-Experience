@@ -28,7 +28,8 @@ test.describe("Landing immersive", () => {
   });
 
   test("Start Reading Quran mewajibkan login dan kembali ke tujuan", async ({ page }) => {
-    await page.goto("/");
+    // Menguji pengalihan auth, bukan 3D: tanpa render WebGL agar tidak bergantung pada beban CPU runner.
+    await page.goto("/?3d=off");
     await page.getByRole("link", { name: /Start Reading Quran/ }).click();
     await expect(page).toHaveURL(/\/login\?next=%2Fquran/);
     await page.getByLabel("Email").fill("demo@nur.local");

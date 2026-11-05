@@ -81,7 +81,7 @@ export class SyncService {
     const status = row.status as PushResultItem["status"];
     // SUPERSEDED/NOOP adalah catatan internal; bagi klien perubahan ini tetap APPLIED.
     const internal = row.status === "APPLIED" && row.conflictReason !== null;
-    return { idempotencyKey: row.idempotencyKey, status, resultVersion: row.resultVersion, reason: internal ? null : row.conflictReason };
+    return { idempotencyKey: row.idempotencyKey, status, resultVersion: row.resultVersion, serverRecord: null, reason: internal ? null : row.conflictReason };
   }
 
   private async pushOne(userId: string, sessionId: string, change: Change): Promise<PushResultItem> {

@@ -38,10 +38,11 @@ class HealthController {
     QuranService,
     SyncService,
     AdminService,
-    // Urutan eksekusi guard global: laju → CSRF → autentikasi → peran.
+    // Urutan guard global: laju → autentikasi → CSRF → peran.
+    // Autentikasi lebih dulu agar sesi kedaluwarsa selalu 401 (memicu refresh/login di klien), bukan 403 CSRF.
     { provide: APP_GUARD, useClass: RateLimitGuard },
-    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: EnvelopeInterceptor },

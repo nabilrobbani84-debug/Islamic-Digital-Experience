@@ -88,11 +88,6 @@ jobs:
         run: npm run build
         working-directory: apps/api
 
-      - name: Boot diagnostics (raw stderr)
-        if: hashFiles('apps/api/prisma/migrations/**') != ''
-        run: node dist/test/ratelimit.test.js 2>&1 | head -60
-        working-directory: apps/api
-
       - name: Integration tests
         if: hashFiles('apps/api/prisma/migrations/**') != ''
         run: npm test

@@ -14,7 +14,7 @@ import { cn } from "@/lib/cn";
 
 function NavPill({ to, label }: { to: string; label: string }) {
   return (
-    <NavLink to={to} className="relative rounded-full px-3.5 py-2 text-sm font-medium whitespace-nowrap">
+    <NavLink to={to} className="relative rounded-full px-2.5 py-2 text-[13px] font-medium whitespace-nowrap xl:px-3.5 xl:text-sm">
       {({ isActive }) => (
         <>
           {isActive && <motion.span layoutId="nav-active" className="absolute inset-0 rounded-full bg-surface-2 ring-1 ring-gold/30" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
@@ -53,7 +53,7 @@ function KnowledgeMenu() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
-        className={cn("inline-flex items-center gap-1 rounded-full px-3.5 py-2 text-sm font-medium transition-colors", active || open ? "bg-surface-2 text-fg" : "text-muted hover:text-fg")}
+        className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-2 text-[13px] font-medium transition-colors xl:px-3.5 xl:text-sm", active || open ? "bg-surface-2 text-fg" : "text-muted hover:text-fg")}
       >
         {KNOWLEDGE_GROUP.label}
         <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} aria-hidden />
@@ -181,7 +181,7 @@ export function TopNav({ transparent = false }: { transparent?: boolean }) {
           <KnowledgeMenu />
           <NavPill to={DHIKR_NAV.to} label={DHIKR_NAV.label} />
         </nav>
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
           <button
             type="button"
             onClick={() => setCommandOpen(true)}

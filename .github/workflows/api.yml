@@ -56,7 +56,13 @@ jobs:
         working-directory: apps/api
 
       - name: Migration drift check (schema vs migrations)
-        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+        # Satu-satunya selisih yang diizinkan: index trigram kustom pada verses.text_normalized, yang tidak dapat
+        # dinyatakan di schema.prisma (lihat apps/api/prisma/README.md). Selisih lain = migration belum dibuat.
+        run: |
+          out=$(npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma 2>&1 || true)
+          echo "$out"
+          unexpected=$(echo "$out" | grep -E '^\s*\[[-+*]\]' | grep -v -F 'Removed index on columns (text_normalized)' | grep -v -F 'Changed the `verses` table' || true)
+          if [ -n "$unexpected" ]; then echo "::error::Drift tak terduga:"; echo "$unexpected"; exit 1; fi
         working-directory: apps/api
 
       - name: Verify custom constraints are present

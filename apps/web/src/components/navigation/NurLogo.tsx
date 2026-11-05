@@ -24,7 +24,7 @@ export function NurLogo({ to = "/", className, compact = false }: { to?: string;
     <Link to={to} className={cn("group inline-flex items-center gap-2.5 rounded-xl", className)} aria-label="NUR — beranda">
       <NurMark className="transition-transform duration-500 ease-nur group-hover:rotate-45" />
       {!compact && (
-        <span className="leading-none">
+        <span className="hidden leading-none sm:block lg:hidden xl:block">
           <span className="block text-lg font-bold tracking-[0.28em] text-fg">NUR</span>
           <span className="block text-[10px] tracking-[0.18em] text-muted uppercase">Islamic Digital Experience</span>
         </span>

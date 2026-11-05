@@ -40,10 +40,10 @@ export function SyncStatusBadge({ compact = false, className }: { compact?: bool
   const content = (
     <>
       <Icon className={cn("size-4 shrink-0", kind === "syncing" && "animate-spin")} aria-hidden />
-      <span className={cn("text-xs font-semibold", compact && "sr-only md:not-sr-only")}>{v.label}</span>
+      <span className={cn("text-xs font-semibold", compact && "sr-only xl:not-sr-only")}>{v.label}</span>
     </>
   );
-  const base = cn("inline-flex h-9 items-center gap-1.5 rounded-full border px-3", v.tone, className);
+  const base = cn("inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 xl:px-3", v.tone, className);
 
   return needsAttention ? (
     <Link to="/profile?tab=sync" className={base} data-testid="sync-status" data-kind={kind} title={v.detail} aria-label={`${v.label}. ${v.detail}. Buka tinjauan sinkronisasi`}>

@@ -122,7 +122,8 @@ test.describe.serial("frontend ↔ backend nyata", () => {
       return text + rows.join("");
     });
     expect(leaked).not.toMatch(/password|refresh|token|argon2|nur_rt|nur_at/i);
-    expect(errors).toEqual([]);
+    // Satu-satunya error konsol yang sah: 403 dari login SENGAJA sebelum email diverifikasi.
+    expect(errors).toEqual(["Failed to load resource: the server responded with a status of 403 (Forbidden)"]);
   });
 
   test("Al-Qur'an dari backend: daftar, reader, terjemahan, tafsir kosong, pencarian", async ({ page }) => {

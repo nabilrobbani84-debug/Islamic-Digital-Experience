@@ -11,7 +11,7 @@ import { loadConfig } from "./config";
 
 export async function createApp(): Promise<NestExpressApplication> {
   const cfg = loadConfig();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: cfg.NODE_ENV === "test" ? false : ["log", "warn", "error"] });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: cfg.NODE_ENV === "test" ? ["error"] : ["log", "warn", "error"], abortOnError: false });
   app.set("trust proxy", cfg.TRUST_PROXY);
   app.disable("x-powered-by");
   app.setGlobalPrefix("api/v1");

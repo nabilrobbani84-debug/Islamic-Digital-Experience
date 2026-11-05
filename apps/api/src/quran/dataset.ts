@@ -74,7 +74,8 @@ export function validateDataset(data: QuranDataset, options: { partial?: boolean
 
   if (!options.partial) {
     if (seenSurah.size !== STANDARD.surahs) errors.push(`Jumlah surah ${seenSurah.size}, seharusnya ${STANDARD.surahs}`);
-    for (let n = 1; n <= STANDARD.surahs; n++) if (!seenSurah.has(n)) errors.push(`Surah ${n} tidak ada`);
+    const missing = Array.from({ length: STANDARD.surahs }, (_, i) => i + 1).filter((n) => !seenSurah.has(n));
+    if (missing.length > 0) errors.push(`Surah tidak ada: ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? ` (+${missing.length - 10} lainnya)` : ""}`);
     if (total !== STANDARD.verses) errors.push(`Jumlah ayat ${total}, seharusnya ${STANDARD.verses}`);
     if (data.juzs.length !== STANDARD.juzs) errors.push(`Jumlah juz ${data.juzs.length}, seharusnya ${STANDARD.juzs}`);
   }

@@ -11,6 +11,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 // Prisma 7: URL koneksi dikonfigurasi di prisma.config.ts, bukan di sini.
@@ -76,6 +77,7 @@ enum RevisionAction {
 }
 
 enum FavoriteContentType {
+  ASMAUL_HUSNA
   DHIKR_ITEM
   DAILY_DUA
   HADITH
@@ -92,7 +94,6 @@ enum SyncEntityType {
   DHIKR_SESSION
   ZAKAT_CALCULATION
   USER_FAVORITE
-  ASMAUL_FAVORITE
   AUDIO_PLAYLIST
 }
 
@@ -134,7 +135,6 @@ model User {
   dhikrSessions     DhikrSession[]
   zakatCalculations ZakatCalculation[]
   favorites         UserFavorite[]
-  asmaulFavorites   AsmaulFavorite[]
   playlists         AudioPlaylist[]
   syncChanges       SyncChange[]
   auditLogs         AdminAuditLog[]
@@ -387,6 +387,7 @@ model ReadingProgress {
   surahId   Int       @map("surah_id")
   verseId   BigInt    @map("verse_id")
   lastPage  Int       @map("last_page")
+  positionAt DateTime  @default(now()) @map("position_at") @db.Timestamptz(3)
   version   Int       @default(1)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -667,7 +668,9 @@ model ZakatRule {
 model ZakatCalculation {
   id             String    @id @default(uuid(7)) @db.Uuid
   userId         String    @map("user_id") @db.Uuid
-  ruleId         String    @map("rule_id") @db.Uuid
+  ruleId         String?   @map("rule_id") @db.Uuid
+  type           ZakatType
+  ruleVersion    String    @map("rule_version") @db.VarChar(20)
   totalAssets    Decimal   @map("total_assets") @db.Decimal(20, 2)
   deductibleDebt Decimal   @default(0) @map("deductible_debt") @db.Decimal(20, 2)
   netAssets      Decimal   @map("net_assets") @db.Decimal(20, 2)
@@ -682,7 +685,7 @@ model ZakatCalculation {
   deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   user  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rule  ZakatRule              @relation(fields: [ruleId], references: [id])
+  rule  ZakatRule?             @relation(fields: [ruleId], references: [id], onDelete: SetNull)
   items ZakatCalculationItem[]
 
   @@index([userId, updatedAt])
@@ -715,25 +718,7 @@ model AsmaulHusna {
   source          String?
   status          ContentStatus @default(DRAFT)
 
-  favorites AsmaulFavorite[]
-
   @@map("asmaul_husna")
-}
-
-model AsmaulFavorite {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  asmaulId  Int       @map("asmaul_id")
-  version   Int       @default(1)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
-
-  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  asmaul AsmaulHusna @relation(fields: [asmaulId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, asmaulId])
-  @@map("asmaul_favorites")
 }
 
 model DhikrCategory {
@@ -766,7 +751,8 @@ model DhikrItem {
 model DhikrSession {
   id          String    @id @default(uuid(7)) @db.Uuid
   userId      String    @map("user_id") @db.Uuid
-  dhikrItemId String    @map("dhikr_item_id") @db.Uuid
+  dhikrItemId String?   @map("dhikr_item_id") @db.Uuid
+  label       String    @default("Hitungan bebas") @db.VarChar(120)
   count       Int       @default(0)
   targetCount Int       @map("target_count")
   startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
@@ -776,7 +762,7 @@ model DhikrSession {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
 
   user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item DhikrItem @relation(fields: [dhikrItemId], references: [id])
+  item DhikrItem? @relation(fields: [dhikrItemId], references: [id], onDelete: SetNull)
 
   @@index([userId, updatedAt])
   @@map("dhikr_sessions")
@@ -891,12 +877,12 @@ model HadithExplanation {
 
 // Relasi polimorfik: content_id TIDAK punya foreign key ke tabel konten.
 // Backend wajib memvalidasi keberadaan konten (sesuai content_type) dalam transaksi yang sama saat insert.
-// Ayat memakai Bookmark; Asmaul Husna memakai AsmaulFavorite (keduanya punya FK langsung).
+// Ayat memakai Bookmark (FK langsung). Asmaul Husna, doa, hadis, dan dzikir memakai tabel ini.
 model UserFavorite {
   id          String              @id @default(uuid(7)) @db.Uuid
   userId      String              @map("user_id") @db.Uuid
   contentType FavoriteContentType @map("content_type")
-  contentId   String              @map("content_id") @db.Uuid
+  contentId   String              @map("content_id") @db.VarChar(64)
   version     Int                 @default(1)
   createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1010,7 +996,7 @@ model SyncChange {
   userId          String           @map("user_id") @db.Uuid
   sessionId       String?          @map("session_id") @db.Uuid // perangkat asal perubahan
   entityType      SyncEntityType   @map("entity_type")
-  entityId        String           @map("entity_id") @db.Uuid
+  entityId        String           @map("entity_id") @db.VarChar(64)
   operation       SyncOperation
   payload         Json
   baseVersion     Int?             @map("base_version") // versi yang diedit klien; NULL untuk entitas baru

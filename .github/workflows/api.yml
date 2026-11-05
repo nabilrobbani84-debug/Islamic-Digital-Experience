@@ -1,0 +1,89 @@
+name: API CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Prisma, build, integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nur
+          POSTGRES_PASSWORD: nur
+          POSTGRES_DB: nur_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nur -d nur_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://nur:nur@localhost:5432/nur_test
+      JWT_SECRET: ci-test-secret-ci-test-secret-ci-test-secret
+      NODE_ENV: test
+      MAIL_TRANSPORT: memory
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prisma validate
+        run: npx prisma validate
+        working-directory: apps/api
+
+      - name: Diff schema to SQL (bootstrap artifact)
+        run: |
+          mkdir -p /tmp/artifacts
+          npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > /tmp/artifacts/init.sql
+          wc -l /tmp/artifacts/init.sql
+          cp ../../package-lock.json /tmp/artifacts/package-lock.json
+        working-directory: apps/api
+
+      - name: Upload bootstrap artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-bootstrap
+          path: /tmp/artifacts
+          retention-days: 7
+
+      - name: Apply migrations
+        if: hashFiles('apps/api/prisma/migrations/**') != ''
+        run: npx prisma migrate deploy
+        working-directory: apps/api
+
+      - name: Verify custom constraints are present
+        if: hashFiles('apps/api/prisma/migrations/**') != ''
+        run: |
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_constraint where conname in ('verse_number_positive','zakat_amount_nonnegative','valid_audio_segment','dataset_versions_published_requires_approval')" | grep -qx 4
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_indexes where indexname like 'idx_custom_%'" | grep -qx 4
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_trigger where tgname='admin_audit_logs_append_only'" | grep -qx 1
+
+      - name: Typecheck
+        if: hashFiles('apps/api/prisma/migrations/**') != ''
+        run: npm run typecheck
+        working-directory: apps/api
+
+      - name: Build and integration tests
+        if: hashFiles('apps/api/prisma/migrations/**') != ''
+        run: npm test
+        working-directory: apps/api

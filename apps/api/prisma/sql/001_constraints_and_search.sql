@@ -155,8 +155,6 @@ ALTER TABLE zakat_calculation_items
 ALTER TABLE asmaul_husna
   ADD CONSTRAINT asmaul_husna_number_range CHECK (number BETWEEN 1 AND 99);
 
-ALTER TABLE asmaul_favorites
-  ADD CONSTRAINT asmaul_favorites_version_positive CHECK (version >= 1);
 
 ALTER TABLE dhikr_items
   ADD CONSTRAINT dhikr_items_recommended_positive CHECK (recommended_count > 0);

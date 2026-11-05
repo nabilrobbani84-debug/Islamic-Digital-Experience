@@ -40,11 +40,14 @@ async function apiLogin(request: APIRequestContext, email: string, password: str
   return cookies.find((c) => c.name === "nur_csrf")?.value ?? "";
 }
 
-async function uiLogin(page: Page, email: string, password: string): Promise<void> {
+/** Login lewat UI. `expectSuccess=false` untuk skenario gagal (tetap di halaman login). */
+async function uiLogin(page: Page, email: string, password: string, expectSuccess = true): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Kata sandi", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Masuk", exact: true }).click();
+  // Tunggu sesi benar-benar terbentuk sebelum navigasi berikutnya, supaya `goto` tidak memotong respons login.
+  if (expectSuccess) await expect(page).toHaveURL(/\/dashboard$/);
 }
 
 test.describe.serial("frontend ↔ backend nyata", () => {
@@ -77,13 +80,13 @@ test.describe.serial("frontend ↔ backend nyata", () => {
     await expect(page.getByRole("heading", { name: "Periksa email Anda" })).toBeVisible();
 
     // Belum terverifikasi → backend menolak login.
-    await uiLogin(page, email, PASSWORD);
+    await uiLogin(page, email, PASSWORD, false);
     await expect(page.getByRole("alert").filter({ hasText: "Email belum diverifikasi" })).toBeVisible();
 
     await page.goto(`/verify-email?token=${await emailToken(email, "verify-email")}`);
     await expect(page.getByRole("heading", { name: "Email terverifikasi" })).toBeVisible();
 
-    await uiLogin(page, email, "salah-total-1");
+    await uiLogin(page, email, "salah-total-1", false);
     await expect(page.getByRole("alert").filter({ hasText: "Email atau kata sandi salah." })).toBeVisible();
     await uiLogin(page, email, PASSWORD);
     await expect(page).toHaveURL(/\/dashboard$/);

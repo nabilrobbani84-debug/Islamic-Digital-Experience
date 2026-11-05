@@ -27,7 +27,7 @@ export function Switch({ checked, onChange, label, description, disabled }: Swit
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 disabled:opacity-40",
+          "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 disabled:opacity-40 pointer-coarse:h-8 pointer-coarse:w-14 before:absolute before:-inset-2 before:content-['']",
           checked ? "border-emerald-nur bg-emerald-nur" : "border-line bg-surface-2",
         )}
       >

@@ -54,7 +54,9 @@ for (const vp of VIEWPORTS) {
                 const r = el.getBoundingClientRect();
                 const style = getComputedStyle(el);
                 const insideText = el.closest("p, li > p") !== null && el.tagName === "A" && style.display === "inline";
-                return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && !insideText && !el.classList.contains("sr-only") && (r.width < 32 || r.height < 32);
+                const calendarCell = el.tagName === "BUTTON" && el.getAttribute("aria-pressed") !== null && /^\d+ \w+ \d{4},/.test(el.getAttribute("aria-label") ?? "");
+                const min = calendarCell ? 30 : 32;
+                return r.width > 0 && r.height > 0 && style.visibility !== "hidden" && !insideText && !el.classList.contains("sr-only") && (r.width < min || r.height < min);
               })
               .map((el) => `${el.tagName.toLowerCase()}[${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30)}] ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`),
           );

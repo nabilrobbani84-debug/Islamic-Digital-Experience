@@ -148,7 +148,7 @@ export default function QuranReaderPage() {
   return (
     <div className={cn("mx-auto", focusMode ? "max-w-3xl" : "max-w-4xl")}>
       <nav aria-label="Navigasi surah" className="mb-6 flex items-center justify-between gap-2">
-        <Link to="/quran" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+        <Link to="/quran" className="inline-flex min-h-11 items-center gap-1 text-sm text-muted hover:text-fg">
           <ChevronLeft className="size-4" aria-hidden /> Daftar surah
         </Link>
         <div className="flex items-center gap-1">

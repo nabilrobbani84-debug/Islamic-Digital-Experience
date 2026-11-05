@@ -64,7 +64,7 @@ export function DailyInspiration() {
                   Hadis Arba'in no. {h.number}
                   {h.reference ? ` · ${h.reference}` : ""}
                 </figcaption>
-                <Link to={`/hadith/${h.number}`} className="mt-4 inline-block text-sm font-medium text-gold-text hover:underline">
+                <Link to={`/hadith/${h.number}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-medium text-gold-text hover:underline">
                   Baca penjelasan
                 </Link>
               </figure>

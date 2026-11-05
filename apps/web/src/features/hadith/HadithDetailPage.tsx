@@ -30,7 +30,7 @@ export default function HadithDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link to="/hadith" className="mb-6 inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+      <Link to="/hadith" className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm text-muted hover:text-fg">
         <ChevronLeft className="size-4" aria-hidden /> Daftar hadis
       </Link>
       {query.isPending ? (

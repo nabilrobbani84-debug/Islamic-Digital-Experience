@@ -147,6 +147,7 @@ test.describe.serial("frontend ↔ backend nyata", () => {
 
   test("bookmark offline-first tersinkron ke server dan terlihat dari sesi lain", async ({ page, context, playwright, baseURL }) => {
     await uiLogin(page, email, PASSWORD);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await page.goto("/quran/1");
     await expect(page.getByText("عِلْمٌ نَافِعٌ")).toBeVisible();
 

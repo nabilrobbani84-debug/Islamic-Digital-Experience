@@ -21,10 +21,10 @@ test.describe("Landing immersive", () => {
       .toBeGreaterThan(0.6);
     // Hero tidak boleh bertumpuk dengan kartu bab: disembunyikan sepenuhnya (bukan sekadar memudar).
     await expect(page.getByRole("heading", { level: 1, name: /Your Spiritual Journey/ })).toBeHidden();
-    // Hero sudah memudar.
-    await expect
-      .poll(async () => Number(await page.getByRole("heading", { level: 1 }).evaluate((el) => getComputedStyle(el.closest(".absolute") ?? el).opacity)))
-      .toBeLessThan(0.2);
+    // Gulir kembali ke atas: hero tampil lagi dan bab disembunyikan (tidak ada tumpang tindih).
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect(page.getByRole("heading", { level: 1, name: /Your Spiritual Journey/ })).toBeVisible();
+    await expect(chapter).toBeHidden();
   });
 
   test("Start Reading Quran mewajibkan login dan kembali ke tujuan", async ({ page }) => {

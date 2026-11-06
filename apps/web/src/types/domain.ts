@@ -62,6 +62,8 @@ export interface SurahDetail extends Surah {
   verses: Verse[];
   editionId?: string | null;
   editionName?: string | null;
+  /** Teks basmalah yang mengawali ayat 1 pada sumber tertentu; ditampilkan terpisah sebagai kepala surah. */
+  bismillahPrefix?: string | null;
 }
 
 export interface TranslationEdition {

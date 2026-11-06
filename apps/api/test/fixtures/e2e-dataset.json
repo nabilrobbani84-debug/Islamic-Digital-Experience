@@ -14,7 +14,7 @@
     {
       "number": 2, "nameArabic": "سورة ثانية", "nameLatin": "Surah Kedua", "revelationType": "MADANIYAH",
       "verses": [
-        { "number": 1, "textUthmani": "نُورٌ هَادِيَةٌ", "page": 2, "juz": 1 },
+        { "number": 1, "textUthmani": "كِتَابٌ مُبَارَكٌ نُورٌ هَادِيَةٌ", "page": 2, "juz": 1 },
         { "number": 2, "textUthmani": "حِكْمَةٌ بَالِغَةٌ", "page": 2, "juz": 1 }
       ]
     }

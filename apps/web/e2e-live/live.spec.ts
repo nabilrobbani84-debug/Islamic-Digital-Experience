@@ -148,6 +148,17 @@ test.describe.serial("frontend ↔ backend nyata", () => {
     expect(errors).toEqual([]);
   });
 
+  test("basmalah yang menempel di ayat 1 ditampilkan sebagai kepala surah, ayat 1 berisi sisanya", async ({ page }) => {
+    await uiLogin(page, email, PASSWORD);
+    await page.goto("/quran/2");
+    await expect(page.getByTestId("bismillah")).toHaveText("كِتَابٌ مُبَارَكٌ");
+    const ayat1 = page.locator("#ayat-1");
+    await expect(ayat1).toContainText("نُورٌ هَادِيَةٌ");
+    await expect(ayat1).not.toContainText("كِتَابٌ مُبَارَكٌ");
+    await page.goto("/quran/1");
+    await expect(page.getByTestId("bismillah")).toHaveCount(0);
+  });
+
   test("bookmark offline-first tersinkron ke server dan terlihat dari sesi lain", async ({ page, context, playwright, baseURL }) => {
     await uiLogin(page, email, PASSWORD);
     await expect(page).toHaveURL(/\/dashboard$/);

@@ -54,6 +54,21 @@ describe("Al-Qur'an", () => {
     assert.equal((await get("/quran/editions")).body.data.length, 1);
   });
 
+  it("basmalah di awal ayat 1 ditunjukkan sebagai awalan, teks tetap verbatim; surah 1 dan 9 tanpa awalan", async () => {
+    const admin = await makeUser(ctx.prisma, { email: "a@contoh.id", role: "SUPER_ADMIN" });
+    await seedQuranFixture(ctx.prisma, admin.id);
+    const opener = "كِتَابٌ مُبَارَكٌ"; // teks ayat 1:1 pada fixture
+    await ctx.prisma.verse.updateMany({ where: { surahId: 2, verseNumber: 1 }, data: { textUthmani: `${opener} نُورٌ` } });
+    await ctx.prisma.surah.create({ data: { id: 9, number: 9, nameArabic: "ط", nameLatin: "Surah Sembilan", revelationType: "MADANIYAH", totalVerses: 1 } });
+    await ctx.prisma.verse.create({ data: { surahId: 9, verseNumber: 1, globalNumber: 99, textUthmani: `${opener} bukan-awalan`, textNormalized: "x", pageNumber: 3, juzNumber: 1 } });
+
+    const two = (await get("/quran/surahs/2")).body.data;
+    assert.equal(two.bismillahPrefix, opener);
+    assert.equal(two.verses[0].textUthmani, `${opener} نُورٌ`, "API tidak mengubah teks");
+    assert.equal((await get("/quran/surahs/1")).body.data.bismillahPrefix, null);
+    assert.equal((await get("/quran/surahs/9")).body.data.bismillahPrefix, null, "surah 9 tidak memakai basmalah");
+  });
+
   it("validasi parameter: surah di luar rentang, juz tidak valid, query pencarian pendek", async () => {
     assert.equal((await get("/quran/surahs/0")).status, 400);
     assert.equal((await get("/quran/surahs/115")).status, 400);

@@ -16,6 +16,7 @@ import { cn } from "@/lib/cn";
 import type { Verse } from "@/types/domain";
 import { useQaris, useSurahDetail } from "./api";
 import { VerseItem } from "./components/VerseItem";
+import { splitBismillah } from "./bismillah";
 import { ReaderSettingsDialog } from "./components/ReaderSettingsDialog";
 import { TafsirDialog } from "./components/TafsirDialog";
 import { NotFoundPage } from "@/components/feedback/RouteFallbacks";
@@ -69,6 +70,7 @@ export default function QuranReaderPage() {
   const bookmarks = useLiveQuery(() => db.bookmarks.where("[surahNumber+verseNumber]").between([surahNumber, 0], [surahNumber, 9999]).toArray(), [surahNumber]);
   const bookmarked = useMemo(() => new Set((bookmarks ?? []).filter((b) => !b.deletedAt).map((b) => b.verseNumber)), [bookmarks]);
   const surah = detail.data?.data;
+  const displayVerses = useMemo(() => (surah ? splitBismillah(surah.verses, surah.bismillahPrefix) : []), [surah]);
 
   useReadingTracker(surahNumber, !!surah);
 
@@ -174,6 +176,11 @@ export default function QuranReaderPage() {
               </p>
               <h1 className="mt-3 text-2xl font-bold sm:text-3xl">{surah.nameLatin}</h1>
               {surah.meaning && <p className="mt-1 text-muted">{surah.meaning}</p>}
+              {surah.bismillahPrefix && (
+                <p lang="ar" dir="rtl" data-testid="bismillah" className="quran-arabic mt-5 text-center text-gold-text">
+                  {surah.bismillahPrefix}
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <Badge tone="gold">Surah ke-{surah.number}</Badge>
                 <Badge>{surah.totalVerses} ayat</Badge>
@@ -225,7 +232,7 @@ export default function QuranReaderPage() {
           </div>
 
           <div className={cn(focusMode && "px-1 sm:px-6")}>
-            {surah.verses.map((v) => (
+            {displayVerses.map((v) => (
               <VerseItem
                 key={v.id}
                 verse={v}

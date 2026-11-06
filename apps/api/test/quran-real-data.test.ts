@@ -97,6 +97,19 @@ describe("Al-Qur'an data nyata (Tanzil) di PostgreSQL + API", { skip: !enabled }
     assert.deepEqual((await request(ctx.http).get(api("/quran/juz/1"))).body.data.startSurah, 1);
   });
 
+  it("basmalah di awal ayat 1: terdeteksi dari data itu sendiri pada 112 surah (bukan surah 1 dan 9)", async () => {
+    const opener = text.find((l) => l.s === 1 && l.a === 1)?.t ?? "";
+    assert.ok(opener.length > 10);
+    const prefixed = text.filter((l) => l.a === 1 && l.s !== 1 && l.s !== 9 && l.t.startsWith(`${opener} `)).map((l) => l.s);
+    assert.equal(prefixed.length, 112, `surah berawalan basmalah: ${prefixed.length}`);
+    for (const n of [2, 36, 114]) {
+      const body = (await request(ctx.http).get(api(`/quran/surahs/${n}`))).body.data;
+      assert.equal(body.bismillahPrefix, opener, `surah ${n}`);
+      assert.equal(body.verses[0].textUthmani, text.find((l) => l.s === n && l.a === 1)?.t, "teks tetap verbatim");
+    }
+    for (const n of [1, 9]) assert.equal((await request(ctx.http).get(api(`/quran/surahs/${n}`))).body.data.bismillahPrefix, null, `surah ${n}`);
+  });
+
   it("pencarian pada data nyata: referensi, Arab tanpa harakat, dan terjemahan Indonesia (full-text)", async () => {
     const ref = await request(ctx.http).get(api("/quran/search?q=2:255"));
     assert.equal(ref.body.data.length, 1);

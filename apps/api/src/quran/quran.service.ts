@@ -74,6 +74,16 @@ export class QuranService {
     if (editionId && !edition) throw notFound("Edisi terjemahan tidak ditemukan");
 
     const verses = await this.prisma.verse.findMany({ where: { surahId: surah.id }, orderBy: { verseNumber: "asc" } });
+
+    // Beberapa sumber (mis. Tanzil) menyisipkan basmalah di awal ayat 1 hampir semua surah. Teks disimpan dan dilayani
+    // VERBATIM; di sini hanya menunjukkan awalan tersebut agar klien dapat menampilkannya sebagai kepala surah.
+    // Teks basmalah diambil dari data (ayat 1:1), bukan ditulis di kode. Surah 1 dan 9 tidak memakainya.
+    let bismillahPrefix: string | null = null;
+    const first = verses[0];
+    if (surah.number !== 1 && surah.number !== 9 && first) {
+      const opener = await this.prisma.verse.findFirst({ where: { verseNumber: 1, surah: { number: 1 } }, select: { textUthmani: true } });
+      if (opener && first.textUthmani.startsWith(`${opener.textUthmani} `)) bismillahPrefix = opener.textUthmani;
+    }
     const translations = edition
       ? await this.prisma.verseTranslation.findMany({ where: { editionId: edition.id, verse: { surahId: surah.id } }, select: { verseId: true, translationText: true } })
       : [];
@@ -84,6 +94,7 @@ export class QuranService {
         ...toSurahDto(surah),
         editionId: edition?.id ?? null,
         editionName: edition?.name ?? null,
+        bismillahPrefix,
         verses: verses.map((v) => ({
           id: v.id.toString(),
           number: v.verseNumber,

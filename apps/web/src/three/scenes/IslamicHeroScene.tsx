@@ -27,7 +27,7 @@ export const HERO_KEYFRAMES: readonly CameraKeyframe[] = [
  */
 export function composeHero(aspect: number): { x: number; y: number; z: number } {
   if (aspect >= 1.25) return { x: -4.2, y: 0, z: 0 };
-  if (aspect < 0.8) return { x: 0, y: -3.4, z: 11 };
+  if (aspect < 0.8) return { x: 0, y: -4.8, z: 12 };
   return { x: 0, y: -1.6, z: 4 };
 }
 

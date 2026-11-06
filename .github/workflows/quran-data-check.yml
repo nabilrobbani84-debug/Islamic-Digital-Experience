@@ -1,0 +1,42 @@
+name: Quran source check
+
+# Memeriksa sumber data publik dari runner CI (yang punya akses internet) dan membuktikan jalur impor
+# end-to-end pada data nyata. Data TIDAK disimpan di repository dan tidak diterbitkan: hanya hidup di
+# database CI sementara. Hanya berjalan saat file terkait berubah atau dipicu manual.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/quran-data-check.yml"
+      - "apps/api/scripts/tanzil-*.ts"
+      - "apps/api/src/quran/tanzil.ts"
+      - "apps/api/src/quran/dataset.ts"
+      - "apps/api/test/tanzil.test.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe sumber data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Cek URL kandidat
+        run: |
+          mkdir -p /tmp/src && cd /tmp/src
+          probe() {
+            name="$1"; url="$2"
+            code=$(curl -sS -L --max-time 60 -o "$name" -w '%{http_code} %{content_type} %{size_download}B' "$url" 2>&1 || echo "curl-gagal")
+            echo "=== $name  <- $url"; echo "    $code"
+            [ -s "$name" ] && head -c 700 "$name" | head -n 12 && echo
+          }
+          probe tanzil-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
+          probe quran-data.xml "https://tanzil.net/res/text/metadata/quran-data.xml"
+      - name: Daftar isi salinan GitHub
+        run: |
+          for repo in acfatah/tanzil Mushaf-Learning/quran-text dotquran/corpus; do
+            echo "=== $repo"; gh api "repos/$repo/contents" --jq '.[] | "\(.type)\t\(.name)\t\(.size)"' 2>&1 | head -30
+          done

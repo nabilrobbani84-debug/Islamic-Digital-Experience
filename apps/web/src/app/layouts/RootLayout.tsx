@@ -1,4 +1,4 @@
-import { Outlet, ScrollRestoration } from "react-router";
+import { Outlet, ScrollRestoration, useLocation } from "react-router";
 import { RefreshCw, WifiOff, X } from "lucide-react";
 import { SessionBootstrap } from "@/app/providers/SessionBootstrap";
 import { Toaster } from "@/components/feedback/Toaster";
@@ -19,7 +19,9 @@ function ConnectivityBanner() {
 }
 
 function MockBanner() {
-  if (api.mode !== "mock") return null;
+  const { pathname } = useLocation();
+  // Di landing banner menimpa tombol CTA pada layar kecil; peringatan mock tetap tampil di seluruh halaman aplikasi.
+  if (api.mode !== "mock" || pathname === "/") return null;
   return (
     <div className="fixed bottom-20 left-3 z-[60] rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold text-amber-700 backdrop-blur dark:text-amber-200 lg:bottom-3" role="note">
       MODE MOCK DEVELOPMENT — data contoh, bukan konten keagamaan

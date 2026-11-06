@@ -99,15 +99,15 @@ function HeroIntro({ progress }: { progress: MotionValue<number> }) {
     <motion.div style={{ opacity, y, pointerEvents, visibility }} className="absolute inset-0 flex items-end pb-20 md:items-center md:pb-0">
       <div className="mx-auto w-full max-w-7xl px-5 pt-16 sm:px-8">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="max-w-2xl">
-          <div className="mb-6 flex items-center gap-3">
+          <div className="mb-6 hidden items-center gap-3 sm:flex">
             <NurMark className="size-11" />
             <span className="text-sm font-semibold tracking-[0.4em] text-gold-soft">NUR</span>
           </div>
-          <h1 className="text-4xl leading-[1.08] font-bold tracking-tight sm:text-6xl lg:text-7xl">
+          <h1 className="text-[2rem] leading-[1.1] font-bold tracking-tight sm:text-6xl sm:leading-[1.08] lg:text-7xl">
             <span className="nur-text-gradient">Your Spiritual Journey, Reimagined.</span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-ivory/80 sm:text-xl">Explore the beauty of Islam through a more meaningful digital experience.</p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <p className="mt-4 max-w-xl text-base text-ivory/85 [text-shadow:0_2px_18px_rgb(0_0_0/0.7)] sm:mt-6 sm:text-xl">Explore the beauty of Islam through a more meaningful digital experience.</p>
+          <div className="mt-6 flex flex-wrap items-center gap-3 sm:mt-9">
             <a href="#experience-end" className="inline-flex h-13 items-center gap-2 rounded-2xl bg-gradient-to-b from-gold-soft to-gold px-7 font-semibold text-navy shadow-glow transition-transform active:scale-[0.97]">
               Explore NUR <ArrowDown className="size-4" aria-hidden />
             </a>
@@ -115,7 +115,7 @@ function HeroIntro({ progress }: { progress: MotionValue<number> }) {
               <BookOpen className="size-4" aria-hidden /> Start Reading Quran
             </Link>
           </div>
-          <div className="mt-8">
+          <div className="mt-5 sm:mt-8">
             <NextPrayerPill />
           </div>
         </motion.div>

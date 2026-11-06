@@ -97,16 +97,28 @@ describe("Al-Qur'an data nyata (Tanzil) di PostgreSQL + API", { skip: !enabled }
     assert.deepEqual((await request(ctx.http).get(api("/quran/juz/1"))).body.data.startSurah, 1);
   });
 
-  it("basmalah di awal ayat 1: terdeteksi dari data itu sendiri pada 112 surah (bukan surah 1 dan 9)", async () => {
+  it("basmalah di awal ayat 1: 112 surah (selain 1 dan 9) terdeteksi dari data; awalan literal, teks tetap verbatim", async () => {
     const opener = text.find((l) => l.s === 1 && l.a === 1)?.t ?? "";
     assert.ok(opener.length > 10);
-    const prefixed = text.filter((l) => l.a === 1 && l.s !== 1 && l.s !== 9 && l.t.startsWith(`${opener} `)).map((l) => l.s);
-    assert.equal(prefixed.length, 112, `surah berawalan basmalah: ${prefixed.length}`);
-    for (const n of [2, 36, 114]) {
+    const openerWords = opener.split(" ").length;
+    const surahs = [...new Set(text.map((l) => l.s))].filter((n) => n !== 1 && n !== 9);
+    assert.equal(surahs.length, 112);
+
+    // Ekspektasi diturunkan langsung dari berkas sumber, terpisah dari implementasi API: jumlah kata sama dengan
+    // basmalah 1:1, dan setelah normalisasi harus sama dengan 1:1. Penulisan harakat boleh berbeda antar-surah.
+    const variants: number[] = [];
+    for (const n of surahs) {
+      const verse1 = text.find((l) => l.s === n && l.a === 1)?.t ?? "";
+      const expected = verse1.split(" ").slice(0, openerWords).join(" ");
+      assert.equal(normalizeArabic(expected), normalizeArabic(opener), `surah ${n}: ayat 1 harus diawali basmalah`);
+      if (expected !== opener) variants.push(n);
       const body = (await request(ctx.http).get(api(`/quran/surahs/${n}`))).body.data;
-      assert.equal(body.bismillahPrefix, opener, `surah ${n}`);
-      assert.equal(body.verses[0].textUthmani, text.find((l) => l.s === n && l.a === 1)?.t, "teks tetap verbatim");
+      assert.equal(body.bismillahPrefix, expected, `surah ${n}`);
+      assert.equal(body.verses[0].textUthmani, verse1, `surah ${n}: teks tetap verbatim`);
     }
+    // Hanya dicatat (bukan syarat lulus): surah yang menuliskan basmalah dengan harakat berbeda dari 1:1.
+    console.log(`  catatan: penulisan basmalah berbeda dari 1:1 pada surah: ${variants.join(", ") || "-"}`);
+
     for (const n of [1, 9]) assert.equal((await request(ctx.http).get(api(`/quran/surahs/${n}`))).body.data.bismillahPrefix, null, `surah ${n}`);
   });
 

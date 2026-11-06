@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { ApiException, notFound } from "../common/http";
-import { escapeLike, hasArabic, normalizeArabic } from "../common/arabic";
+import { escapeLike, hasArabic, leadingPhrase, normalizeArabic } from "../common/arabic";
 import { CONFIG, type AppConfig } from "../config";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -78,11 +78,13 @@ export class QuranService {
     // Beberapa sumber (mis. Tanzil) menyisipkan basmalah di awal ayat 1 hampir semua surah. Teks disimpan dan dilayani
     // VERBATIM; di sini hanya menunjukkan awalan tersebut agar klien dapat menampilkannya sebagai kepala surah.
     // Teks basmalah diambil dari data (ayat 1:1), bukan ditulis di kode. Surah 1 dan 9 tidak memakainya.
+    // Dicocokkan pada bentuk ternormalisasi karena penulisan harakat bisa berbeda antar-surah (pada data Tanzil,
+    // surah 95 dan 97 menambahkan tasydid); yang dikembalikan adalah potongan literal dari ayat 1 surah ini.
     let bismillahPrefix: string | null = null;
     const first = verses[0];
     if (surah.number !== 1 && surah.number !== 9 && first) {
       const opener = await this.prisma.verse.findFirst({ where: { verseNumber: 1, surah: { number: 1 } }, select: { textUthmani: true } });
-      if (opener && first.textUthmani.startsWith(`${opener.textUthmani} `)) bismillahPrefix = opener.textUthmani;
+      if (opener) bismillahPrefix = leadingPhrase(first.textUthmani, opener.textUthmani);
     }
     const translations = edition
       ? await this.prisma.verseTranslation.findMany({ where: { editionId: edition.id, verse: { surahId: surah.id } }, select: { verseId: true, translationText: true } })

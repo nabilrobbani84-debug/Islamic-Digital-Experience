@@ -69,6 +69,18 @@ describe("Al-Qur'an", () => {
     assert.equal((await get("/quran/surahs/9")).body.data.bismillahPrefix, null, "surah 9 tidak memakai basmalah");
   });
 
+  it("basmalah dengan penulisan harakat berbeda (mis. tasydid tambahan) tetap terdeteksi; awalan dikembalikan apa adanya", async () => {
+    const admin = await makeUser(ctx.prisma, { email: "a@contoh.id", role: "SUPER_ADMIN" });
+    await seedQuranFixture(ctx.prisma, admin.id);
+    const variant = "كِتَّابٌ مُبَارَكٌ"; // tasydid tambahan; setelah normalisasi sama dengan ayat 1:1
+    await ctx.prisma.surah.create({ data: { id: 3, number: 3, nameArabic: "ث", nameLatin: "Surah Ketiga", revelationType: "MAKKIYAH", totalVerses: 1 } });
+    await ctx.prisma.verse.create({ data: { surahId: 3, verseNumber: 1, globalNumber: 98, textUthmani: `${variant} نُورٌ`, textNormalized: "x", pageNumber: 3, juzNumber: 1 } });
+
+    const three = (await get("/quran/surahs/3")).body.data;
+    assert.equal(three.bismillahPrefix, variant, "awalan literal dari ayat itu sendiri, bukan salinan ayat 1:1");
+    assert.equal(three.verses[0].textUthmani, `${variant} نُورٌ`, "API tidak mengubah teks");
+  });
+
   it("validasi parameter: surah di luar rentang, juz tidak valid, query pencarian pendek", async () => {
     assert.equal((await get("/quran/surahs/0")).status, 400);
     assert.equal((await get("/quran/surahs/115")).status, 400);

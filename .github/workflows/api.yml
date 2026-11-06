@@ -1,0 +1,193 @@
+name: API CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: Prisma, build, integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nur
+          POSTGRES_PASSWORD: nur
+          POSTGRES_DB: nur_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nur -d nur_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://nur:nur@localhost:5432/nur_test
+      JWT_SECRET: ci-test-secret-ci-test-secret-ci-test-secret
+      NODE_ENV: test
+      MAIL_TRANSPORT: memory
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Prisma validate
+        run: npx prisma validate
+        working-directory: apps/api
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+        working-directory: apps/api
+
+      - name: Migration drift check (schema vs migrations)
+        # Satu-satunya selisih yang diizinkan: index trigram kustom pada verses.text_normalized, yang tidak dapat
+        # dinyatakan di schema.prisma (lihat apps/api/prisma/README.md). Selisih lain = migration belum dibuat.
+        run: |
+          out=$(npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma 2>&1 || true)
+          echo "$out"
+          unexpected=$(echo "$out" | grep -E '^\s*\[[-+*]\]' | grep -v -F 'Removed index on columns (text_normalized)' | grep -v -F 'Changed the `verses` table' || true)
+          if [ -n "$unexpected" ]; then echo "::error::Drift tak terduga:"; echo "$unexpected"; exit 1; fi
+        working-directory: apps/api
+
+      - name: Verify custom constraints are present
+        run: |
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_constraint where conname in ('verse_number_positive','zakat_amount_nonnegative','valid_audio_segment','dataset_versions_published_requires_approval')" | grep -qx 4
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_indexes where indexname like 'idx_custom_%'" | grep -qx 4
+          psql "$DATABASE_URL" -tAc "select count(*) from pg_trigger where tgname='admin_audit_logs_append_only'" | grep -qx 1
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: apps/api
+
+      - name: Integration tests
+        run: npm test
+        working-directory: apps/api
+
+  fullstack:
+    name: Full-stack E2E (web + API + PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nur
+          POSTGRES_PASSWORD: nur
+          POSTGRES_DB: nur_live
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nur -d nur_live"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://nur:nur@localhost:5432/nur_live
+      JWT_SECRET: live-e2e-secret-live-e2e-secret-live-e2e
+      NODE_ENV: test
+      PORT: 3000
+      WEB_ORIGIN: http://localhost:4173
+      APP_BASE_URL: http://localhost:4173
+      MAIL_TRANSPORT: file
+      MAIL_OUTBOX_FILE: /tmp/nur-outbox.jsonl
+      AUTH_RATE_LIMIT: 200
+      SEED_ADMIN_EMAIL: admin@live.nur
+      SEED_ADMIN_PASSWORD: LiveAdmin-12345
+      VITE_API_PROXY_TARGET: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build API and apply migrations
+        run: |
+          npm run build
+          npx prisma migrate deploy
+        working-directory: apps/api
+
+      - name: Seed admin and import fixture dataset (REVIEW, belum diterbitkan)
+        run: |
+          node dist/scripts/seed-admin.js
+          node dist/scripts/import-quran.js test/fixtures/e2e-dataset.json --partial
+        working-directory: apps/api
+
+      - name: Start API
+        run: |
+          node dist/src/main.js > /tmp/api.out 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://localhost:3000/api/v1/health && break; sleep 1; done
+        working-directory: apps/api
+
+      - name: Build web (production, no mock)
+        run: npm run build -w @nur/web
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+
+      - name: Live E2E
+        run: npx playwright test -c playwright.live.config.ts
+        working-directory: apps/web
+
+      - name: API log
+        if: always()
+        run: tail -60 /tmp/api.out || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-live
+          path: apps/web/playwright-report-live
+          retention-days: 7
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t nur-api:ci .
+      - name: Build web image
+        run: docker build -f apps/web/Dockerfile -t nur-web:ci .
+      - name: Web image serves SPA, health endpoint, and security headers
+        run: |
+          docker run -d --name web --add-host api:127.0.0.1 -p 8081:80 nur-web:ci
+          for i in $(seq 1 20); do curl -fsS http://localhost:8081/healthz && break; sleep 1; done
+          echo; curl -fsS http://localhost:8081/ -o /tmp/index.html -D /tmp/index.headers
+          cat /tmp/index.headers
+          grep -q 'id="root"' /tmp/index.html || { echo '--- index.html:'; cat /tmp/index.html; exit 1; }
+          curl -fsS http://localhost:8081/quran/1 | grep -q 'id="root"'
+          grep -qi '^content-security-policy:' /tmp/index.headers
+          grep -qi '^x-content-type-options: nosniff' /tmp/index.headers
+          curl -fsSI http://localhost:8081/sw.js | grep -qi '^cache-control: no-cache'
+          curl -fsSI "http://localhost:8081/assets/$(grep -o 'index-[A-Za-z0-9_-]*\.js' /tmp/index.html | head -1)" | grep -qi 'immutable'
+      - name: API image refuses to start with unsafe production config
+        run: |
+          set +e
+          out=$(docker run --rm -e NODE_ENV=production -e DATABASE_URL=postgresql://x -e JWT_SECRET=ganti-dengan-secret-acak-minimal-32-karakter nur-api:ci 2>&1)
+          code=$?
+          echo "$out" | tail -3
+          [ $code -ne 0 ] && echo "$out" | grep -q 'Konfigurasi tidak valid'

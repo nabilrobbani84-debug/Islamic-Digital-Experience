@@ -1,0 +1,18 @@
+{
+  "name": "@nur/islamic-calculations",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mesin perhitungan Islam lokal (waktu sholat, kiblat, Hijriah, zakat) tanpa dependensi dan tanpa API eksternal.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "~5.9.2"
+  }
+}

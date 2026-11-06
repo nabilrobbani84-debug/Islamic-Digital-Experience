@@ -1,0 +1,22 @@
+{
+  "name": "nur-islamic-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NUR Islamic Digital Experience \u2014 monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @nur/web",
+    "build": "npm run build -w @nur/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @nur/islamic-calculations && npm run test -w @nur/web",
+    "e2e": "npm run e2e -w @nur/web",
+    "test:api": "npm test -w @nur/api",
+    "dev:api": "npm run start:dev -w @nur/api"
+  }
+}

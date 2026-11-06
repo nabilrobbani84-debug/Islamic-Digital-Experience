@@ -1,0 +1,68 @@
+# NUR self-hosted. Salin infrastructure/env.example → .env dan ISI semua nilai (tanpa nilai contoh).
+#   docker compose up -d --build
+# TLS: letakkan reverse proxy ber-HTTPS di depan service `web` (port 8080) dan set TRUST_PROXY=1.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nur
+      POSTGRES_USER: nur
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?isi POSTGRES_PASSWORD di .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nur -d nur"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Sengaja TANPA `ports`: database tidak boleh dapat diakses dari luar jaringan Docker.
+
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://nur:${POSTGRES_PASSWORD}@postgres:5432/nur
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [backend]
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://nur:${POSTGRES_PASSWORD}@postgres:5432/nur
+      STORAGE_DIR: /storage
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    volumes:
+      - ./storage:/storage
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [backend, frontend]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      api: { condition: service_healthy }
+    networks: [frontend]
+    mem_limit: 128m
+
+networks:
+  backend: { internal: true }
+  frontend: {}
+
+volumes:
+  postgres_data:

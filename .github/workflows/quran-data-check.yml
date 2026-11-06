@@ -1,0 +1,96 @@
+name: Quran source check
+
+# Membuktikan jalur impor end-to-end pada DATA NYATA dari Tanzil (sumber publik):
+# unduh → konversi → validasi ketat (114 surah, 6.236 ayat, 30 juz) → impor → persetujuan admin → API.
+# Data hanya hidup di database CI sementara: tidak disimpan di repository dan tidak diterbitkan.
+# Berjalan saat file terkait berubah atau dipicu manual.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/quran-data-check.yml"
+      - "apps/api/scripts/tanzil-*.ts"
+      - "apps/api/scripts/import-quran.ts"
+      - "apps/api/src/quran/**"
+      - "apps/api/src/common/arabic.ts"
+      - "apps/api/test/tanzil.test.ts"
+      - "apps/api/test/quran-real-data.test.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  real-data:
+    name: Impor dan verifikasi data Tanzil
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: nur
+          POSTGRES_PASSWORD: nur
+          POSTGRES_DB: nur_real
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nur -d nur_real"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://nur:nur@localhost:5432/nur_real
+      JWT_SECRET: real-data-secret-real-data-secret-real
+      NODE_ENV: test
+      MAIL_TRANSPORT: memory
+      SEED_ADMIN_EMAIL: admin@real.nur
+      SEED_ADMIN_PASSWORD: RealAdmin-12345
+      TANZIL_TEXT: /tmp/src/quran-uthmani.txt
+      TANZIL_TRANSLATION: /tmp/src/id.indonesian.txt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build API dan migrasi
+        run: |
+          npm run build
+          npx prisma migrate deploy
+        working-directory: apps/api
+
+      - name: Unduh sumber (Tanzil)
+        run: |
+          mkdir -p /tmp/src && cd /tmp/src
+          curl -fsS -L --max-time 120 -o quran-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
+          curl -fsS -L --max-time 120 -o quran-data.xml "https://tanzil.net/res/text/metadata/quran-data.xml"
+          curl -fsS -L --max-time 120 -o id.indonesian.txt "https://tanzil.net/trans/?transID=id.indonesian&type=txt-2"
+          sha256sum quran-uthmani.txt quran-data.xml id.indonesian.txt
+          wc -c quran-uthmani.txt quran-data.xml id.indonesian.txt
+
+      - name: Konversi ke dataset NUR dan validasi ketat
+        run: |
+          node dist/scripts/tanzil-build.js \
+            --text /tmp/src/quran-uthmani.txt --metadata /tmp/src/quran-data.xml --out /tmp/src/dataset.json \
+            --translation /tmp/src/id.indonesian.txt --translation-name "Bahasa Indonesia (Kemenag RI)" --translation-language id \
+            --translation-source "Tanzil.net - Indonesian Ministry of Religious Affairs" \
+            --translation-license "Ketentuan Tanzil; periksa https://tanzil.net/trans sebelum distribusi"
+        working-directory: apps/api
+
+      - name: Impor (tanpa --partial) dan seed admin
+        run: |
+          node dist/scripts/import-quran.js /tmp/src/dataset.json
+          node dist/scripts/seed-admin.js
+        working-directory: apps/api
+
+      - name: Verifikasi data nyata di database dan API
+        run: QURAN_REAL_DATA=1 node --test --test-reporter=spec dist/test/quran-real-data.test.js
+        working-directory: apps/api
+
+      - name: Ringkasan
+        if: always()
+        run: |
+          psql "$DATABASE_URL" -c "select datasetname_ringkas.* from (select dataset_name as datasetname, version, status, record_count, left(checksum,16) as checksum from dataset_versions order by dataset_name) datasetname_ringkas"
+          psql "$DATABASE_URL" -tAc "select 'ayat='||count(*)||' halaman='||count(distinct page_number)||' juz='||count(distinct juz_number)||' hizb='||count(distinct hizb_number) from verses"

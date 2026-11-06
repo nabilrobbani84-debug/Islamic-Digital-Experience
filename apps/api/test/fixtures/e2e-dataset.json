@@ -1,0 +1,35 @@
+{
+  "format": "nur-quran-dataset/1",
+  "version": "e2e-fixture-1",
+  "source": { "name": "Fixture E2E NUR", "publisher": "NUR", "license": "TEST-ONLY", "attribution": "Data uji sintetis. BUKAN teks Al-Qur'an.", "url": "https://example.org/sumber-uji" },
+  "surahs": [
+    {
+      "number": 1, "nameArabic": "سورة اختبار", "nameLatin": "Surah Percobaan", "meaning": "Fixture uji", "revelationType": "MAKKIYAH",
+      "verses": [
+        { "number": 1, "textUthmani": "كِتَابٌ مُبَارَكٌ", "page": 1, "juz": 1 },
+        { "number": 2, "textUthmani": "عِلْمٌ نَافِعٌ", "page": 1, "juz": 1 },
+        { "number": 3, "textUthmani": "قَلْبٌ سَلِيمٌ", "page": 1, "juz": 1 }
+      ]
+    },
+    {
+      "number": 2, "nameArabic": "سورة ثانية", "nameLatin": "Surah Kedua", "revelationType": "MADANIYAH",
+      "verses": [
+        { "number": 1, "textUthmani": "كِتَابٌ مُبَارَكٌ نُورٌ هَادِيَةٌ", "page": 2, "juz": 1 },
+        { "number": 2, "textUthmani": "حِكْمَةٌ بَالِغَةٌ", "page": 2, "juz": 1 }
+      ]
+    }
+  ],
+  "juzs": [{ "number": 1, "startSurah": 1, "startVerse": 1, "endSurah": 2, "endVerse": 2 }],
+  "translations": [
+    {
+      "name": "Terjemahan Uji", "language": "id", "version": "1", "source": { "name": "Sumber Uji", "license": "TEST-ONLY", "url": "https://example.org/terjemahan-uji" },
+      "items": [
+        { "surah": 1, "verse": 1, "text": "[TEST] terjemahan percobaan satu" },
+        { "surah": 1, "verse": 2, "text": "[TEST] terjemahan percobaan dua" },
+        { "surah": 1, "verse": 3, "text": "[TEST] terjemahan percobaan tiga" },
+        { "surah": 2, "verse": 1, "text": "[TEST] terjemahan percobaan empat" },
+        { "surah": 2, "verse": 2, "text": "[TEST] terjemahan percobaan lima" }
+      ]
+    }
+  ]
+}

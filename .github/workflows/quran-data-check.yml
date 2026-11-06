@@ -35,6 +35,31 @@ jobs:
           }
           probe tanzil-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
           probe quran-data.xml "https://tanzil.net/res/text/metadata/quran-data.xml"
+      - name: Struktur metadata
+        run: |
+          cd /tmp/src
+          python3 - <<'PY'
+          import re, collections
+          x = open('quran-data.xml', encoding='utf-8').read()
+          print('root attrs:', re.search(r'<quran[^>]*>', x).group(0)[:200])
+          tags = collections.Counter(re.findall(r'<(\w+)\s', x))
+          print('elemen:', dict(tags))
+          for name in ['juz', 'hizb', 'quarter', 'manzil', 'ruku', 'page', 'sajda']:
+              m = re.findall(r'<%s\s[^>]*/>' % name, x)
+              print(f'--- {name}: {len(m)}'); print('\n'.join(m[:2])); print('...'); print('\n'.join(m[-1:]))
+          suras = re.findall(r'<sura\s[^>]*/>', x)
+          print('--- suras:', len(suras), 'jumlah ayat =', sum(int(re.search(r'ayas="(\d+)"', t).group(1)) for t in suras))
+          print('type values:', set(re.findall(r'type="(\w+)"', ' '.join(suras))))
+          lines = [l for l in open('tanzil-uthmani.txt', encoding='utf-8').read().splitlines() if l.strip()]
+          data = [l for l in lines if re.match(r'^\d+\|\d+\|', l)]
+          print('baris data:', len(data), '| baris non-data:', [l[:80] for l in lines if l not in data][:8])
+          PY
+      - name: Terjemahan Indonesia (Tanzil)
+        run: |
+          cd /tmp/src
+          code=$(curl -sS -L --max-time 60 -o id.txt -w '%{http_code} %{size_download}B' "https://tanzil.net/trans/?transID=id.indonesian&type=txt-2" || echo gagal)
+          echo "id.indonesian -> $code"; head -n 5 id.txt | cut -c1-160
+          echo "--- baris data: $(grep -cE '^[0-9]+\|[0-9]+\|' id.txt)"; grep -vE '^[0-9]+\|[0-9]+\|' id.txt | head -12 | cut -c1-200
       - name: Daftar isi salinan GitHub
         run: |
           for repo in acfatah/tanzil Mushaf-Learning/quran-text dotquran/corpus; do

@@ -6,13 +6,13 @@ Request yang mengubah data mengirim header `X-CSRF-Token` berisi nilai cookie `n
 Respons mengikuti envelope spesifikasi arsitektur (bagian 4.2):
 
 ```json
-{ "success": true, "data": {}, "meta": { "datasetVersion": "…", "source": "…", "license": "…" } }
+{ "success": true, "data": {}, "meta": { "datasetVersion": "…", "source": "…", "license": "…", "sourceUrl": "https://…" } }
 { "success": false, "error": { "code": "VALIDATION_ERROR", "message": "…", "details": {} } }
 ```
 
 `401` memicu satu kali `POST /auth/refresh`, lalu request diulang. Jika refresh gagal, pengguna diarahkan ke `/login`.
 
-**Status:** seluruh endpoint di bawah ini sudah diimplementasikan di `apps/api` dan diuji (62 test integrasi + 7 E2E full-stack). Error memakai envelope `{ success:false, error:{ code, message, details } }`: 401 saat sesi tidak ada, 403 `CSRF_INVALID` saat token CSRF salah, 429 `RATE_LIMITED` dengan `Retry-After`.
+**Status:** seluruh endpoint di bawah ini sudah diimplementasikan di `apps/api` dan diuji (79 test integrasi + 9 E2E full-stack). Error memakai envelope `{ success:false, error:{ code, message, details } }`: 401 saat sesi tidak ada, 403 `CSRF_INVALID` saat token CSRF salah, 429 `RATE_LIMITED` dengan `Retry-After`.
 
 Kolom **Spec** menandai endpoint yang ada di spesifikasi arsitektur 4.1 (✓) atau **usulan** frontend yang perlu disepakati backend (P).
 
@@ -49,6 +49,14 @@ Kolom **Spec** menandai endpoint yang ada di spesifikasi arsitektur 4.1 (✓) at
 | P | GET | `/admin/overview`, `/admin/content-sources`, `/admin/users`, `/admin/audit-logs`, `/admin/revisions`, `/admin/sync-status` | Panel admin |
 | P | PATCH | `/admin/users/:id` | `{ role }` (SUPER_ADMIN) atau `{ isActive }` |
 | P | POST | `/admin/revisions`, `/admin/revisions/:id/review` | Alur persetujuan konten |
+
+### Tambahan pada detail surah (`GET /quran/surahs/:number`)
+
+| Field | Arti |
+|-------|------|
+| `bismillahPrefix` | `string` atau `null`. Awalan basmalah yang menempel di awal teks ayat 1, dipotong literal dari ayat itu sendiri (penulisan harakat bisa berbeda antar-surah). `null` untuk surah 1, surah 9, dan sumber yang tidak memakai awalan. `textUthmani` pada respons tetap verbatim; klien memotong awalan hanya pada tampilan (`splitBismillah`). |
+| `editionSource` | `{ name, url, license }` atau `null`. Atribusi sumber terjemahan yang dipakai. |
+| `meta.sourceUrl` | Tautan sumber teks untuk atribusi. Klien hanya merender tautan `https:`. |
 
 Bookmark dan progres bacaan (`/bookmarks`, `/reading-progress` di spesifikasi) disinkronkan lewat `/sync/push|pull` sebagai entitas `BOOKMARK` dan `READING_PROGRESS`, supaya penulisan offline dan online memakai jalur yang sama.
 

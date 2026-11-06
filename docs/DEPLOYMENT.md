@@ -35,13 +35,39 @@ docker compose run --rm -e SEED_ADMIN_EMAIL=admin@contoh.id -e SEED_ADMIN_PASSWO
 
 ## 4. Impor dataset Al-Qur'an
 
-Letakkan dataset berformat `nur-quran-dataset/1` (lihat `apps/api/src/quran/dataset.ts`) di volume yang dapat dibaca container:
+Repository ini tidak membawa teks Al-Qur'an. Jalur yang sudah diuji dengan data nyata memakai berkas dari Tanzil
+(`tanzil.net`). **Baca dulu ketentuannya** (https://tanzil.net/docs/Text_License: salinan verbatim, atribusi wajib) dan
+ketentuan terjemahan yang Anda pilih di https://tanzil.net/trans. Parameter `agree=true` di URL unduhan berarti Anda
+menyetujui ketentuan itu.
+
+Unduh tiga berkas ke folder `data/` (teks Utsmani, metadata, terjemahan Indonesia):
+
+```bash
+mkdir -p data && cd data
+curl -fsSL -o quran-uthmani.txt "https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true"
+curl -fsSL -o quran-data.xml "https://tanzil.net/res/text/metadata/quran-data.xml"
+curl -fsSL -o id.indonesian.txt "https://tanzil.net/trans/?transID=id.indonesian&type=txt-2"
+```
+
+Ubah ke format dataset NUR (`nur-quran-dataset/1`). Skrip ini tidak mengunduh apa pun dan tidak mengubah teks;
+ia menolak berkas yang tidak lengkap (114 surah, 6.236 ayat, 30 juz). Isi `--translation-license` dengan lisensi
+terjemahan yang **sudah Anda periksa**; nilai bawaan di workflow CI hanya penanda, bukan lisensi resmi:
+
+```bash
+docker compose run --rm --user "$(id -u):$(id -g)" -v "$PWD/data:/data" api node dist/scripts/tanzil-build.js \
+  --text /data/quran-uthmani.txt --metadata /data/quran-data.xml --out /data/quran.json \
+  --translation /data/id.indonesian.txt --translation-name "Bahasa Indonesia" --translation-language id \
+  --translation-source "Tanzil.net" --translation-license "<lisensi terjemahan yang sudah diverifikasi>"
+```
+
+Impor dataset (format lain, mis. dari penyedia lain, cukup diubah ke `nur-quran-dataset/1`, lihat `apps/api/src/quran/dataset.ts`):
 
 ```bash
 docker compose run --rm -v "$PWD/data:/data:ro" api node dist/scripts/import-quran.js /data/quran.json
 ```
 
 Hasil berstatus REVIEW. Buka **Admin → Dataset → Setujui & terbitkan** setelah verifikasi manusia (`DATA_INTEGRITY.md`).
+Aplikasi menampilkan nama sumber sebagai tautan ke `tanzil.net` di halaman Al-Qur'an; jangan menghapusnya.
 Audio: salin berkas ke `storage/` dan catat metadata di tabel `qaris`, `audio_assets`, `audio_segments`.
 
 ## 5. Operasi

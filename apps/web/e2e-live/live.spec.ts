@@ -148,6 +148,14 @@ test.describe.serial("frontend ↔ backend nyata", () => {
     expect(errors).toEqual([]);
   });
 
+  test("atribusi sumber: nama sumber teks dan terjemahan berupa tautan https", async ({ page }) => {
+    await uiLogin(page, email, PASSWORD);
+    await page.goto("/quran/2");
+    const note = page.getByTestId("source-note");
+    await expect(note.getByRole("link", { name: "Fixture E2E NUR" })).toHaveAttribute("href", "https://example.org/sumber-uji");
+    await expect(note.getByRole("link", { name: "Sumber Uji" })).toHaveAttribute("href", "https://example.org/terjemahan-uji");
+  });
+
   test("basmalah yang menempel di ayat 1 ditampilkan sebagai kepala surah, ayat 1 berisi sisanya", async ({ page }) => {
     await uiLogin(page, email, PASSWORD);
     await page.goto("/quran/2");

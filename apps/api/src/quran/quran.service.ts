@@ -47,7 +47,12 @@ export class QuranService {
       include: { contentSource: true },
     });
     if (!ds) return null;
-    return { datasetVersion: ds.version, source: ds.contentSource?.name ?? ds.source ?? undefined, license: ds.contentSource?.license ?? undefined };
+    return {
+      datasetVersion: ds.version,
+      source: ds.contentSource?.name ?? ds.source ?? undefined,
+      license: ds.contentSource?.license ?? undefined,
+      sourceUrl: ds.contentSource?.url ?? undefined,
+    };
   }
 
   async surahs(): Promise<{ data: SurahDto[]; meta: Record<string, unknown> }> {
@@ -69,8 +74,8 @@ export class QuranService {
     if (!surah) throw notFound("Surah tidak ditemukan");
 
     const edition = editionId
-      ? await this.prisma.quranEdition.findFirst({ where: { id: editionId, status: "PUBLISHED" } })
-      : await this.prisma.quranEdition.findFirst({ where: { status: "PUBLISHED", language: "id" }, orderBy: { name: "asc" } });
+      ? await this.prisma.quranEdition.findFirst({ where: { id: editionId, status: "PUBLISHED" }, include: { contentSource: true } })
+      : await this.prisma.quranEdition.findFirst({ where: { status: "PUBLISHED", language: "id" }, orderBy: { name: "asc" }, include: { contentSource: true } });
     if (editionId && !edition) throw notFound("Edisi terjemahan tidak ditemukan");
 
     const verses = await this.prisma.verse.findMany({ where: { surahId: surah.id }, orderBy: { verseNumber: "asc" } });
@@ -96,6 +101,8 @@ export class QuranService {
         ...toSurahDto(surah),
         editionId: edition?.id ?? null,
         editionName: edition?.name ?? null,
+        // Atribusi sumber terjemahan (nama, tautan, lisensi) agar klien dapat mencantumkannya.
+        editionSource: edition ? { name: edition.contentSource?.name ?? edition.source, url: edition.contentSource?.url ?? null, license: edition.contentSource?.license ?? null } : null,
         bismillahPrefix,
         verses: verses.map((v) => ({
           id: v.id.toString(),

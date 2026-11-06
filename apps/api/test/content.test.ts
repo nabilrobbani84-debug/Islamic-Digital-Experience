@@ -69,6 +69,19 @@ describe("Al-Qur'an", () => {
     assert.equal((await get("/quran/surahs/9")).body.data.bismillahPrefix, null, "surah 9 tidak memakai basmalah");
   });
 
+  it("atribusi: tautan sumber teks (meta.sourceUrl) dan sumber terjemahan (editionSource) ikut dikirim", async () => {
+    const admin = await makeUser(ctx.prisma, { email: "a@contoh.id", role: "SUPER_ADMIN" });
+    const { edition } = await seedQuranFixture(ctx.prisma, admin.id);
+    await ctx.prisma.contentSource.updateMany({ where: { name: "Fixture Test" }, data: { url: "https://example.org/teks" } });
+    const tsource = await ctx.prisma.contentSource.create({ data: { name: "Penerjemah Uji", license: "CC-BY", url: "https://example.org/terjemahan" } });
+    await ctx.prisma.quranEdition.update({ where: { id: edition.id }, data: { contentSourceId: tsource.id } });
+
+    const body = (await get("/quran/surahs/1")).body;
+    assert.equal(body.meta.sourceUrl, "https://example.org/teks");
+    assert.deepEqual(body.data.editionSource, { name: "Penerjemah Uji", url: "https://example.org/terjemahan", license: "CC-BY" });
+    assert.equal((await get("/quran/surahs")).body.meta.sourceUrl, "https://example.org/teks");
+  });
+
   it("basmalah dengan penulisan harakat berbeda (mis. tasydid tambahan) tetap terdeteksi; awalan dikembalikan apa adanya", async () => {
     const admin = await makeUser(ctx.prisma, { email: "a@contoh.id", role: "SUPER_ADMIN" });
     await seedQuranFixture(ctx.prisma, admin.id);

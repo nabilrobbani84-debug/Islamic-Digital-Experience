@@ -83,12 +83,55 @@ export function GridSkeleton({ items = 6, className }: { items?: number; classNa
   );
 }
 
-export function SourceNote({ source, license, version }: { source?: string; license?: string; version?: string }) {
-  if (!source && !license && !version) return null;
+/** Hanya tautan https yang dirender; nilai lain (javascript:, http:, tidak valid) diabaikan. */
+export function safeHttpsUrl(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function SourceLink({ label, url }: { label: string; url?: string | null }) {
+  const href = safeHttpsUrl(url);
+  if (!href) return <>{label}</>;
   return (
-    <p className="mt-8 text-xs text-muted">
-      {source && <>Sumber: {source}. </>}
+    <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-fg">
+      {label}
+    </a>
+  );
+}
+
+export function SourceNote({
+  source,
+  license,
+  version,
+  url,
+  translation,
+}: {
+  source?: string;
+  license?: string;
+  version?: string;
+  url?: string | null;
+  translation?: { name: string; url?: string | null; license?: string | null } | null;
+}) {
+  if (!source && !license && !version && !translation) return null;
+  return (
+    <p className="mt-8 text-xs text-muted" data-testid="source-note">
+      {source && (
+        <>
+          Sumber: <SourceLink label={source} url={url} />.{" "}
+        </>
+      )}
       {license && <>Lisensi: {license}. </>}
+      {translation && (
+        <>
+          Terjemahan: <SourceLink label={translation.name} url={translation.url} />.{" "}
+          {translation.license && <>Lisensi terjemahan: {translation.license}. </>}
+        </>
+      )}
       {version && <>Versi dataset: {version}.</>}
     </p>
   );

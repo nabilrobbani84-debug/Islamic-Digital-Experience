@@ -1,7 +1,7 @@
 {
   "format": "nur-quran-dataset/1",
   "version": "e2e-fixture-1",
-  "source": { "name": "Fixture E2E NUR", "publisher": "NUR", "license": "TEST-ONLY", "attribution": "Data uji sintetis. BUKAN teks Al-Qur'an." },
+  "source": { "name": "Fixture E2E NUR", "publisher": "NUR", "license": "TEST-ONLY", "attribution": "Data uji sintetis. BUKAN teks Al-Qur'an.", "url": "https://example.org/sumber-uji" },
   "surahs": [
     {
       "number": 1, "nameArabic": "سورة اختبار", "nameLatin": "Surah Percobaan", "meaning": "Fixture uji", "revelationType": "MAKKIYAH",
@@ -22,7 +22,7 @@
   "juzs": [{ "number": 1, "startSurah": 1, "startVerse": 1, "endSurah": 2, "endVerse": 2 }],
   "translations": [
     {
-      "name": "Terjemahan Uji", "language": "id", "version": "1", "source": { "name": "Sumber Uji", "license": "TEST-ONLY" },
+      "name": "Terjemahan Uji", "language": "id", "version": "1", "source": { "name": "Sumber Uji", "license": "TEST-ONLY", "url": "https://example.org/terjemahan-uji" },
       "items": [
         { "surah": 1, "verse": 1, "text": "[TEST] terjemahan percobaan satu" },
         { "surah": 1, "verse": 2, "text": "[TEST] terjemahan percobaan dua" },

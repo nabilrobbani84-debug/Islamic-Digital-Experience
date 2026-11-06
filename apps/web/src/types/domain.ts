@@ -27,6 +27,15 @@ export interface ContentMeta {
   datasetVersion?: string;
   source?: string;
   license?: string;
+  /** Tautan sumber untuk atribusi (hanya ditampilkan bila https). */
+  sourceUrl?: string;
+}
+
+/** Atribusi sumber terjemahan yang sedang ditampilkan. */
+export interface EditionSource {
+  name: string;
+  url?: string | null;
+  license?: string | null;
 }
 
 export interface WithMeta<T> {
@@ -62,6 +71,7 @@ export interface SurahDetail extends Surah {
   verses: Verse[];
   editionId?: string | null;
   editionName?: string | null;
+  editionSource?: EditionSource | null;
   /** Teks basmalah yang mengawali ayat 1 pada sumber tertentu; ditampilkan terpisah sebagai kepala surah. */
   bismillahPrefix?: string | null;
 }

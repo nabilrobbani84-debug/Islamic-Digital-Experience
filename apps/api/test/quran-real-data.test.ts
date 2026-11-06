@@ -86,6 +86,9 @@ describe("Al-Qur'an data nyata (Tanzil) di PostgreSQL + API", { skip: !enabled }
     assert.equal(list.body.data.length, 114);
     assert.match(list.body.meta.license, /verbatim/);
     assert.match(list.body.meta.source, /Tanzil/);
+    assert.equal(list.body.meta.sourceUrl, "https://tanzil.net", "atribusi wajib: tautan ke tanzil.net");
+    const one = (await request(ctx.http).get(api("/quran/surahs/1"))).body.data;
+    assert.equal(one.editionSource?.url, "https://tanzil.net", "sumber terjemahan juga mencantumkan tautan");
 
     const surah2 = await request(ctx.http).get(api("/quran/surahs/2"));
     assert.equal(surah2.body.data.verses.length, 286);

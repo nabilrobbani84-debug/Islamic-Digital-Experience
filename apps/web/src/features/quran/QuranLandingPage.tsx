@@ -189,7 +189,7 @@ export default function QuranLandingPage() {
           ))}
         </ul>
       )}
-      <SourceNote source={surahs.data?.meta.source} license={surahs.data?.meta.license} version={surahs.data?.meta.datasetVersion} />
+      <SourceNote source={surahs.data?.meta.source} license={surahs.data?.meta.license} version={surahs.data?.meta.datasetVersion} url={surahs.data?.meta.sourceUrl} />
     </div>
   );
 }

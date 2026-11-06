@@ -266,7 +266,7 @@ export default function QuranReaderPage() {
               </Link>
             )}
           </div>
-          <SourceNote source={detail.data.meta.source} license={detail.data.meta.license} version={detail.data.meta.datasetVersion} />
+          <SourceNote source={detail.data.meta.source} license={detail.data.meta.license} version={detail.data.meta.datasetVersion} url={detail.data.meta.sourceUrl} translation={surah.editionSource} />
           <TafsirDialog surahNumber={surahNumber} surahName={surah.nameLatin} verse={tafsirVerse} onClose={() => setTafsirVerse(null)} />
         </>
       )}

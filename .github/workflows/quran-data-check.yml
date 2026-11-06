@@ -84,6 +84,33 @@ jobs:
           node dist/scripts/seed-admin.js
         working-directory: apps/api
 
+      - name: Diagnostik awalan basmalah (sementara; hanya nomor surah dan kode karakter)
+        if: always()
+        run: |
+          node - <<'EOF'
+          const fs = require("fs");
+          const L = fs.readFileSync("/tmp/src/quran-uthmani.txt", "utf8").replace(/^\uFEFF/, "").split(/\r?\n/).flatMap((l) => {
+            const m = /^(\d+)\|(\d+)\|(.+)$/.exec(l);
+            return m ? [{ s: +m[1], a: +m[2], t: m[3] }] : [];
+          });
+          const op = L.find((x) => x.s === 1 && x.a === 1).t;
+          const hex = (s) => [...s].map((c) => c.codePointAt(0).toString(16)).join(" ");
+          console.log("opener 1:1 jumlah karakter:", [...op].length, "kode:", hex(op));
+          const first = L.filter((x) => x.a === 1 && x.s !== 1 && x.s !== 9);
+          const yes = first.filter((v) => v.t.startsWith(op + " "));
+          const no = first.filter((v) => !v.t.startsWith(op + " "));
+          console.log("surah (selain 1 dan 9):", first.length, "berawalan persis:", yes.length, "tidak:", no.map((v) => v.s).join(","));
+          for (const v of no) {
+            const a = [...v.t], b = [...op];
+            let i = 0;
+            while (i < b.length && a[i] === b[i]) i++;
+            console.log("surah", v.s, "jumlah karakter ayat 1:", a.length, "kesamaan awal:", i, "dari", b.length,
+              "| sumber:", hex(a.slice(Math.max(0, i - 1), i + 4).join("")), "| opener:", hex(b.slice(Math.max(0, i - 1), i + 4).join("")));
+          }
+          const s9 = L.find((x) => x.s === 9 && x.a === 1), s1 = L.find((x) => x.s === 1 && x.a === 2);
+          console.log("9:1 diawali opener:", s9.t.startsWith(op), "| 1:2 diawali opener:", s1.t.startsWith(op));
+          EOF
+
       - name: Verifikasi data nyata di database dan API
         run: QURAN_REAL_DATA=1 node --test --test-reporter=spec dist/test/quran-real-data.test.js
         working-directory: apps/api
